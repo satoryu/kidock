@@ -16,6 +16,15 @@ export type TreeEntry = {
   kind: EntryKind;
 };
 
+export type ChangeKind = "created" | "updated" | "deleted";
+
+/** A detected change to a tracked `.md` file (backend event `kidock://changes`). */
+export type FileChange = {
+  projectId: number;
+  relPath: string;
+  kind: ChangeKind;
+};
+
 /** Mirrors `CommandError.kind` on the Rust side, plus `Unknown` for unexpected failures. */
 export type ErrorKind =
   | "ProjectNotFound"
@@ -54,4 +63,6 @@ export interface KidockApi {
   removeProject(projectId: number): Promise<void>;
   listDir(projectId: number, relPath: string): Promise<TreeEntry[]>;
   readMarkdown(projectId: number, relPath: string): Promise<string>;
+  /** Subscribes to batches of detected changes. Returns an unsubscribe function. */
+  onChanges(handler: (changes: FileChange[]) => void): () => void;
 }

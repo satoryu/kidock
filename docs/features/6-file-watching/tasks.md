@@ -22,8 +22,8 @@ Complete in order, with TDD for logic.
 
 ## 4. Frontend
 
-- [ ] 4.1 `onChanges` in `KidockApi` (`tauriApi` via `listen`, `mockApi.emitChanges`). Verify the capability.
-- [ ] 4.2 Tree refresh on changes, keeping expansion.
+- [x] 4.1 `onChanges` in `KidockApi` (`tauriApi` via `listen`, `mockApi.emitChanges`). Verify the capability.
+- [x] 4.2 Tree refresh on changes, keeping expansion.
 
 ## 5. Verification and docs
 

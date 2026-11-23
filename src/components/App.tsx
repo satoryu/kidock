@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "../api/context";
 import type { ProjectInfo } from "../api/types";
 import { AddProjectDialog } from "./AddProjectDialog";
@@ -18,6 +18,21 @@ export function App() {
   const [view, setView] = useState<View>({ kind: "inbox" });
   const [openFile, setOpenFile] = useState<OpenFile | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [treeVersion, setTreeVersion] = useState(0);
+
+  // Refresh the open tree when its project changes on disk.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  useEffect(
+    () =>
+      api.onChanges((changes) => {
+        const v = viewRef.current;
+        if (v.kind === "project" && changes.some((c) => c.projectId === v.id)) {
+          setTreeVersion((n) => n + 1);
+        }
+      }),
+    [api],
+  );
 
   const refresh = useCallback(
     () =>
@@ -90,6 +105,7 @@ export function App() {
           project={current}
           selectedRel={openFile && current && openFile.projectId === current.id ? openFile.relPath : null}
           onSelectFile={(relPath) => current && setOpenFile({ projectId: current.id, relPath })}
+          treeVersion={treeVersion}
         />
       </div>
       <main className="pane pane-main">

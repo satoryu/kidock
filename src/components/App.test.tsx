@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMockApi, type MockSeed } from "../api/mockApi";
 import { renderWithApi, spyApi } from "../test/utils";
@@ -161,6 +161,35 @@ describe("App", () => {
       await userEvent.click(document.body);
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     });
+  });
+
+  it("refreshes the open tree on changes, keeping folders expanded", async () => {
+    const api = createMockApi(seed());
+    renderWithApi(<App />, api);
+    await screen.findByRole("list", { name: "Projects" });
+    await userEvent.click(projectButton("reports"));
+    const notes = await screen.findByRole("treeitem", { name: "notes" });
+    await userEvent.click(notes);
+    await screen.findByRole("treeitem", { name: "n.md" });
+
+    act(() =>
+      api.emitChanges([{ projectId: 1, relPath: "notes/fresh.md", kind: "created", content: "# F" }]),
+    );
+    expect(await screen.findByRole("treeitem", { name: "fresh.md" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "notes" })).toHaveAttribute("aria-expanded", "true");
+
+    // Changes in another project do not refetch this tree.
+    let listCalls = 0;
+    const listDir = api.listDir;
+    api.listDir = (...args) => {
+      listCalls++;
+      return listDir(...args);
+    };
+    act(() => api.emitChanges([{ projectId: 2, relPath: "x.md", kind: "created" }]));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(listCalls).toBe(0);
+    act(() => api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "updated" }]));
+    await waitFor(() => expect(listCalls).toBe(2)); // root + expanded "notes"
   });
 
   it("shows an unavailable project with a warning and an error in the center bar", async () => {

@@ -1,4 +1,10 @@
-import { KidockError, type KidockApi, type ProjectInfo, type TreeEntry } from "./types";
+import {
+  KidockError,
+  type FileChange,
+  type KidockApi,
+  type ProjectInfo,
+  type TreeEntry,
+} from "./types";
 
 type Files = Record<string, string>;
 
@@ -25,6 +31,12 @@ type MockOptions = {
 
 const MAX_NAME_CHARS = 100;
 
+/** The mock adds test/dev controls on top of `KidockApi`. */
+export type MockApi = KidockApi & {
+  /** Simulates the backend detecting changes (also edits the in-memory files). */
+  emitChanges(changes: Array<FileChange & { content?: string }>): void;
+};
+
 /**
  * In-memory `KidockApi`. Mirrors the backend's ordering, name and overlap
  * rules, and error kinds closely enough for UI work and tests.
@@ -32,7 +44,7 @@ const MAX_NAME_CHARS = 100;
 export function createMockApi(
   seed: MockSeed,
   { pickResult = "/mock/new-project", delayMs = 0 }: MockOptions = {},
-): KidockApi {
+): MockApi {
   type Entry = { info: ProjectInfo; files: Files };
   const projects = new Map<number, Entry>();
   const folders = new Map(Object.entries(seed.folders ?? {}));
@@ -47,6 +59,7 @@ export function createMockApi(
     });
   }
 
+  const listeners = new Set<(changes: FileChange[]) => void>();
   const wait = () => new Promise((r) => setTimeout(r, delayMs));
   const segments = (path: string) => path.toLowerCase().split(/[\\/]/).filter(Boolean);
   const startsWith = (a: string[], b: string[]) => b.every((s, i) => a[i] === s);
@@ -135,6 +148,22 @@ export function createMockApi(
           a.name.toLowerCase().localeCompare(b.name.toLowerCase()) ||
           (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
       );
+    },
+
+    onChanges(handler) {
+      listeners.add(handler);
+      return () => listeners.delete(handler);
+    },
+
+    emitChanges(changes) {
+      for (const { content, ...c } of changes) {
+        const files = projects.get(c.projectId)?.files;
+        if (!files) continue;
+        if (c.kind === "deleted") delete files[c.relPath];
+        else files[c.relPath] = content ?? files[c.relPath] ?? "";
+      }
+      const batch = changes.map(({ projectId, relPath, kind }) => ({ projectId, relPath, kind }));
+      for (const l of listeners) l(batch);
     },
 
     async readMarkdown(projectId, rel) {

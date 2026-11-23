@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   KidockError,
   type ErrorKind,
+  type FileChange,
   type KidockApi,
   type ProjectInfo,
   type TreeEntry,
@@ -22,6 +24,9 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set<ErrorKind>([
   "Io",
   "Storage",
 ]);
+
+/** Backend event carrying `FileChange[]` batches. */
+export const CHANGES_EVENT = "kidock://changes";
 
 /** Normalizes whatever `invoke` rejected with into a `KidockError`. */
 export function toKidockError(e: unknown): KidockError {
@@ -55,4 +60,18 @@ export const tauriApi: KidockApi = {
   },
   listDir: (projectId, relPath) => call<TreeEntry[]>("list_dir", { projectId, rel: relPath }),
   readMarkdown: (projectId, relPath) => call<string>("read_markdown", { projectId, rel: relPath }),
+  onChanges(handler) {
+    // `listen` resolves asynchronously; unsubscribing before it resolves
+    // must still detach the listener once it exists.
+    let unlisten: (() => void) | undefined;
+    let active = true;
+    void listen<FileChange[]>(CHANGES_EVENT, (e) => handler(e.payload)).then((fn) => {
+      if (active) unlisten = fn;
+      else fn();
+    });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  },
 };

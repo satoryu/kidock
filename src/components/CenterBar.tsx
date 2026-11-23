@@ -8,10 +8,12 @@ type Props = {
   project: ProjectInfo | undefined;
   selectedRel: string | null;
   onSelectFile: (relPath: string) => void;
+  /** Incremented when the project's files change on disk. */
+  treeVersion: number;
 };
 
 /** Center bar: the Inbox list (#7) or the selected project's folder tree. */
-export function CenterBar({ view, project, selectedRel, onSelectFile }: Props) {
+export function CenterBar({ view, project, selectedRel, onSelectFile, treeVersion }: Props) {
   if (view.kind === "inbox") {
     return (
       <section className="center-bar" aria-label="Inbox">
@@ -33,7 +35,13 @@ export function CenterBar({ view, project, selectedRel, onSelectFile }: Props) {
         </h2>
       </header>
       {project.available ? (
-        <Tree key={project.id} projectId={project.id} selected={selectedRel} onSelect={onSelectFile} />
+        <Tree
+          key={project.id}
+          projectId={project.id}
+          version={treeVersion}
+          selected={selectedRel}
+          onSelect={onSelectFile}
+        />
       ) : (
         <p className="pane-empty pane-error" role="alert">
           Folder not found: {project.path}
