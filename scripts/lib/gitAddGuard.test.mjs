@@ -37,6 +37,8 @@ describe("findBulkGitAdd", () => {
     "GIT_TRACE=1 git add .",
     "cd /repo && git add . && git commit -m wip",
     "/usr/bin/git add -A",
+    "cat <<'EOF'\nliteral\nEOF\ngit add .",
+    "cat <<EOF\n$(git add -A)\nEOF",
   ])("blocks a bulk add inside %j", (cmd) => {
     expect(findBulkGitAdd(cmd)).not.toBeNull();
   });
@@ -55,6 +57,9 @@ describe("findBulkGitAdd", () => {
     "npm run add -- .",
     "git stash -u",
     "git log --all",
+    "gh pr create --body \"$(cat <<'EOF'\nRun `git add -A` never.\ngit add .\nEOF\n)\"",
+    "cat <<EOF > notes.md\ngit add .\nEOF",
+    "cat <<-'X'\n\tgit add -A\n\tX\necho done",
     "",
   ])("allows %j", (cmd) => {
     expect(findBulkGitAdd(cmd)).toBeNull();

@@ -2,7 +2,8 @@
 // Used by the Claude Code PreToolUse hook in `.claude/hooks/guard-git-add.mjs`.
 //
 // This is a guardrail against habits, not a sandbox: it understands quoting,
-// command chains, `$(...)` and backticks, but not `eval`, aliases, or `sh -c`.
+// command chains, `$(...)`, backticks, and heredocs, but not `eval`, aliases,
+// or `sh -c`.
 
 const REASON =
   "Bulk staging is not allowed in this repository (CLAUDE.md). " +
@@ -126,6 +127,64 @@ function parse(src) {
     substitutions.push(src.slice(start + 2, depth === 0 ? j - 1 : j));
     return j;
   };
+  /** Heredocs whose bodies start after the next newline. */
+  /** @type {Array<{ delim: string, quoted: boolean, stripTabs: boolean }>} */
+  let heredocs = [];
+  /**
+   * Skips the bodies of pending heredocs starting at `start` (just after a
+   * newline). Bodies are data, not commands; only an unquoted heredoc expands
+   * `$(...)` and backticks, so those are collected for analysis.
+   */
+  const readHeredocBodies = (start) => {
+    let j = start;
+    for (const { delim, quoted, stripTabs } of heredocs) {
+      const bodyStart = j;
+      let bodyEnd = src.length;
+      while (j < src.length) {
+        const nl = src.indexOf("\n", j);
+        const lineEnd = nl === -1 ? src.length : nl;
+        let line = src.slice(j, lineEnd);
+        if (stripTabs) line = line.replace(/^\t+/, "");
+        const next = nl === -1 ? src.length : nl + 1;
+        if (line === delim) {
+          bodyEnd = j;
+          j = next;
+          break;
+        }
+        j = next;
+      }
+      if (!quoted) substitutions.push(...collectSubstitutions(src.slice(bodyStart, bodyEnd)));
+    }
+    heredocs = [];
+    return j;
+  };
+  /** Reads `<<[-] WORD` starting at `src[start] === "<"`; returns the index after WORD. */
+  const readHeredocStart = (start) => {
+    let j = start + 2;
+    const stripTabs = src[j] === "-";
+    if (stripTabs) j++;
+    while (src[j] === " " || src[j] === "\t") j++;
+    let delim = "";
+    let quoted = false;
+    while (j < src.length && !/[\s;&|<>()]/.test(src[j])) {
+      const q = src[j];
+      if (q === "'" || q === '"') {
+        const end = src.indexOf(q, j + 1);
+        const stop = end === -1 ? src.length : end;
+        delim += src.slice(j + 1, stop);
+        quoted = true;
+        j = stop + 1;
+      } else if (q === "\\") {
+        delim += src[j + 1] ?? "";
+        quoted = true;
+        j += 2;
+      } else {
+        delim += src[j++];
+      }
+    }
+    if (delim) heredocs.push({ delim, quoted, stripTabs });
+    return j;
+  };
   /** Reads a backtick substitution starting at `src[start] === "`"`. */
   const readBacktick = (start) => {
     const end = src.indexOf("`", start + 1);
@@ -186,7 +245,19 @@ function parse(src) {
       continue;
     }
 
-    if (c === ";" || c === "&" || c === "|" || c === "\n" || c === "(" || c === ")") {
+    if (c === "<" && src[i + 1] === "<" && src[i + 2] !== "<") {
+      endWord();
+      i = readHeredocStart(i);
+      continue;
+    }
+
+    if (c === "\n") {
+      endCommand();
+      i = heredocs.length > 0 ? readHeredocBodies(i + 1) : i + 1;
+      continue;
+    }
+
+    if (c === ";" || c === "&" || c === "|" || c === "(" || c === ")") {
       endCommand();
       i++;
       continue;
@@ -204,4 +275,39 @@ function parse(src) {
   }
   endCommand();
   return { commands, substitutions };
+}
+
+/**
+ * Collects `$(...)` and backtick bodies from heredoc text (which is data,
+ * except for these expansions).
+ * @param {string} text
+ * @returns {string[]}
+ */
+function collectSubstitutions(text) {
+  /** @type {string[]} */
+  const found = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "\\") {
+      i += 2;
+    } else if (text[i] === "$" && text[i + 1] === "(") {
+      let depth = 1;
+      let j = i + 2;
+      while (j < text.length && depth > 0) {
+        if (text[j] === "(") depth++;
+        else if (text[j] === ")") depth--;
+        j++;
+      }
+      found.push(text.slice(i + 2, depth === 0 ? j - 1 : j));
+      i = j;
+    } else if (text[i] === "`") {
+      const end = text.indexOf("`", i + 1);
+      const stop = end === -1 ? text.length : end;
+      found.push(text.slice(i + 1, stop));
+      i = stop + 1;
+    } else {
+      i++;
+    }
+  }
+  return found;
 }
