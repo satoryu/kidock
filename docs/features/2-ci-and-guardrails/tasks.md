@@ -16,9 +16,9 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 ## 3. Watch-and-merge
 
-- [ ] 3.1 `evaluateChecks` tests first: all pass; pass + skipping; one fail; cancel; pending; empty; a required OS job missing.
-- [ ] 3.2 Implement `scripts/lib/checks.mjs`.
-- [ ] 3.3 `scripts/watch-pr.mjs`: wait for checks to appear, `gh pr checks --watch --fail-fast`, re-read the JSON, evaluate, exit code. Supports `--require`. Inject the `gh` runner so the flow is unit-testable (no checks → timeout → exit 1).
+- [x] 3.1 `evaluateChecks` tests first: all pass; pass + skipping; one fail; cancel; pending; empty; a required OS job missing.
+- [x] 3.2 Implement `scripts/lib/checks.mjs`.
+- [x] 3.3 `scripts/watch-pr.mjs`: wait for checks to appear, `gh pr checks --watch --fail-fast`, re-read the JSON, evaluate, exit code. Supports `--require`. Inject the `gh` runner so the flow is unit-testable (no checks → timeout → exit 1).
 
 ## 4. CI
 
