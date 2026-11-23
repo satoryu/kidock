@@ -182,10 +182,12 @@ Merging is not the end of the work. An Issue/PR is done only when all of the fol
 1. CI (`.github/workflows/ci.yml`) is green on **both Windows and macOS**, and the merge is chained to it. Never merge as a separate step that ignores the CI result:
 
    ```bash
-   node scripts/watch-pr.mjs <PR> && gh pr merge <PR> --squash --delete-branch
+   HEAD_SHA=$(git rev-parse HEAD)   # the pushed commit you verified
+   node scripts/watch-pr.mjs <PR> --head "$HEAD_SHA" &&
+     gh pr merge <PR> --squash --delete-branch --match-head-commit "$HEAD_SHA"
    ```
 
-   `watch-pr.mjs` exits 0 only when every check passed and both `check (macos-latest)` and `check (windows-latest)` ran. It exits non-zero on failure, cancellation, missing jobs, or no checks. If the workflow's job names change, update `REQUIRED_CHECKS` in `scripts/lib/checks.mjs` (or pass `--require <name>`).
+   `watch-pr.mjs` exits 0 only when every check passed and both `check (macos-latest)` and `check (windows-latest)` ran, for the commit given by `--head`. It exits non-zero on failure, cancellation, missing jobs, no checks, or a PR head that never reaches (or moves away from) that commit. `--match-head-commit` makes the merge itself refuse any other commit, so a push between the watch and the merge cannot slip in unverified. If the workflow's job names change, update `REQUIRED_CHECKS` in `scripts/lib/checks.mjs` (or pass `--require <name>`).
 2. After merging, watch the CI run on `main` until it completes green:
 
    ```bash

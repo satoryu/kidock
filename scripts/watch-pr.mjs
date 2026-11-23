@@ -1,23 +1,35 @@
 #!/usr/bin/env node
 // Waits for a PR's CI and exits 0 only if it is green on every required job.
-// Chain the merge to it so a red or missing CI run never merges:
+// Chain the merge to it, pinned to the same commit, so a red, missing, or
+// stale CI result never merges:
 //
-//   node scripts/watch-pr.mjs <PR> && gh pr merge <PR> --squash --delete-branch
+//   HEAD_SHA=$(git rev-parse HEAD)
+//   node scripts/watch-pr.mjs <PR> --head "$HEAD_SHA" &&
+//     gh pr merge <PR> --squash --delete-branch --match-head-commit "$HEAD_SHA"
 //
-// Options: --require <check name> (repeatable) replaces the default required
-// checks (one per OS, see scripts/lib/checks.mjs).
+// Options:
+//   --head <sha>          only trust checks once the PR head is this commit
+//   --require <name>      (repeatable) replaces the default required checks
+//                         (one per OS, see scripts/lib/checks.mjs)
 import { spawnSync } from "node:child_process";
 import { watchPr } from "./lib/watchPr.mjs";
 
 const args = process.argv.slice(2);
 const required = [];
 let pr;
+let head;
+let bad = false;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--require") required.push(args[++i]);
+  else if (args[i] === "--head") {
+    head = args[++i];
+    if (!head) bad = true;
+  }
   else if (!pr) pr = args[i];
+  else bad = true;
 }
-if (!pr || required.includes(undefined)) {
-  console.error("usage: node scripts/watch-pr.mjs <PR> [--require <check name>]...");
+if (!pr || bad || required.includes(undefined)) {
+  console.error("usage: node scripts/watch-pr.mjs <PR> [--head <sha>] [--require <check name>]...");
   process.exit(2);
 }
 
@@ -42,6 +54,7 @@ process.exit(
     gh,
     log: (m) => console.error(m),
     sleep,
+    head,
     ...(required.length > 0 ? { required } : {}),
   }),
 );

@@ -10,12 +10,16 @@ const pass = [
  * Fake `gh`: each JSON read returns the next response in `reads`
  * (the last one repeats). Records every call.
  */
-function fakeGh(reads) {
+function fakeGh(reads, heads = ["abc123"]) {
   const calls = [];
   let i = 0;
+  let h = 0;
   const gh = (args, opts = {}) => {
     calls.push({ args, inherit: Boolean(opts.inherit) });
     if (args.includes("--watch")) return { status: 0, stdout: "", stderr: "" };
+    if (args[1] === "view") {
+      return { status: 0, stdout: `${heads[Math.min(h++, heads.length - 1)]}\n`, stderr: "" };
+    }
     const r = reads[Math.min(i++, reads.length - 1)];
     return typeof r === "string"
       ? { status: 1, stdout: "", stderr: r }
@@ -24,8 +28,8 @@ function fakeGh(reads) {
   return { gh, calls };
 }
 
-function run(reads, extra = {}) {
-  const { gh, calls } = fakeGh(reads);
+function run(reads, extra = {}, heads) {
+  const { gh, calls } = fakeGh(reads, heads);
   const logs = [];
   let now = 0;
   const code = watchPr({
@@ -77,6 +81,32 @@ describe("watchPr", () => {
   it("returns 1 when an OS job is missing", () => {
     const { code } = run([[pass[0]]]);
     expect(code).toBe(1);
+  });
+
+  describe("with an expected head commit", () => {
+    it("waits until the PR head matches before reading checks", () => {
+      // The first view still shows the previous commit (whose checks were green).
+      const { code, calls } = run([pass], { head: "new456" }, ["old123", "new456"]);
+      expect(code).toBe(0);
+      const views = calls.filter((c) => c.args[1] === "view");
+      expect(views[0].args).toEqual(["pr", "view", "7", "--json", "headRefOid", "-q", ".headRefOid"]);
+      const firstWatch = calls.findIndex((c) => c.args.includes("--watch"));
+      const lastViewBeforeWatch = calls.slice(0, firstWatch).filter((c) => c.args[1] === "view");
+      expect(lastViewBeforeWatch).toHaveLength(2);
+    });
+
+    it("returns 1 when the head never matches", () => {
+      const { code, calls, logs } = run([pass], { head: "new456" }, ["old123"]);
+      expect(code).toBe(1);
+      expect(calls.some((c) => c.args.includes("--watch"))).toBe(false);
+      expect(logs.at(-1)).toMatch(/head is old123, expected new456/);
+    });
+
+    it("returns 1 when the head moves during the watch", () => {
+      const { code, logs } = run([pass], { head: "new456" }, ["new456", "newer789"]);
+      expect(code).toBe(1);
+      expect(logs.at(-1)).toMatch(/head moved to newer789/);
+    });
   });
 
   it("uses a custom required list", () => {
