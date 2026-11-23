@@ -8,6 +8,7 @@
 mod error;
 
 use std::path::Path;
+use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{AppHandle, Runtime, State};
@@ -105,6 +106,14 @@ pub fn do_add_project(
         available: true,
     };
     projects.insert(id, project.clone());
+    // A watcher failure (e.g. OS limits) must not undo the registration;
+    // the project still works, it just won't report changes.
+    if let Err(e) = state.watch_new_project(&project) {
+        eprintln!(
+            "kidock: cannot watch {}: {e}",
+            project.folder.canonical_path.display()
+        );
+    }
     Ok(project)
 }
 
@@ -116,6 +125,7 @@ pub fn do_remove_project(state: &AppState, id: ProjectId) -> Result<(), CommandE
     }
     state.store().delete_project(id)?;
     projects.remove(&id);
+    state.unwatch_project(id);
     Ok(())
 }
 
@@ -152,14 +162,14 @@ fn project_and_rel(
 }
 
 #[tauri::command(async)]
-pub fn list_projects(state: State<'_, AppState>) -> Vec<ProjectInfo> {
+pub fn list_projects(state: State<'_, Arc<AppState>>) -> Vec<ProjectInfo> {
     do_list_projects(&state)
 }
 
 #[tauri::command(async)]
 pub fn add_project<R: Runtime>(
     app: AppHandle<R>,
-    state: State<'_, AppState>,
+    state: State<'_, Arc<AppState>>,
     name: Option<String>,
     path: String,
 ) -> Result<ProjectInfo, CommandError> {
@@ -169,7 +179,10 @@ pub fn add_project<R: Runtime>(
 }
 
 #[tauri::command(async)]
-pub fn remove_project(state: State<'_, AppState>, project_id: i64) -> Result<(), CommandError> {
+pub fn remove_project(
+    state: State<'_, Arc<AppState>>,
+    project_id: i64,
+) -> Result<(), CommandError> {
     // The asset-protocol scope cannot be revoked at runtime; Kidock's own
     // commands reject the id from now on, and the scope resets on restart.
     do_remove_project(&state, ProjectId(project_id))
@@ -177,7 +190,7 @@ pub fn remove_project(state: State<'_, AppState>, project_id: i64) -> Result<(),
 
 #[tauri::command(async)]
 pub fn list_dir(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<AppState>>,
     project_id: i64,
     rel: String,
 ) -> Result<Vec<TreeEntryDto>, CommandError> {
@@ -186,7 +199,7 @@ pub fn list_dir(
 
 #[tauri::command(async)]
 pub fn read_markdown(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<AppState>>,
     project_id: i64,
     rel: String,
 ) -> Result<String, CommandError> {

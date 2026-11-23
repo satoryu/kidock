@@ -87,6 +87,22 @@ describe("createMockApi", () => {
     await expect(api.listDir(1, "")).rejects.toMatchObject({ kind: "NotFound" });
   });
 
+  it("emits changes to subscribers and applies them to its files", async () => {
+    const api = seeded();
+    const seen: unknown[] = [];
+    const off = api.onChanges((c) => seen.push(c));
+    api.emitChanges([{ projectId: 1, relPath: "new.md", kind: "created", content: "# New" }]);
+    expect(seen).toEqual([[{ projectId: 1, relPath: "new.md", kind: "created" }]]);
+    expect(await api.readMarkdown(1, "new.md")).toBe("# New");
+
+    api.emitChanges([{ projectId: 1, relPath: "new.md", kind: "deleted" }]);
+    await expect(api.readMarkdown(1, "new.md")).rejects.toMatchObject({ kind: "NotFound" });
+
+    off();
+    api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "updated" }]);
+    expect(seen).toHaveLength(2);
+  });
+
   it("returns the configured picker result", async () => {
     expect(await createMockApi({}, { pickResult: null }).pickFolder()).toBeNull();
     expect(await createMockApi({}, { pickResult: "/x" }).pickFolder()).toBe("/x");

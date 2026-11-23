@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mockIPC } from "@tauri-apps/api/mocks";
+import { emit } from "@tauri-apps/api/event";
 import { tauriApi, toKidockError } from "./tauriApi";
 import { KidockError } from "./types";
 
@@ -70,6 +71,34 @@ describe("tauriApi", () => {
     const err = await tauriApi.addProject(null, "/r/sub").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(KidockError);
     expect(err).toMatchObject({ kind: "OverlapsProject" });
+  });
+});
+
+describe("tauriApi.onChanges", () => {
+  const change = { projectId: 1, relPath: "a.md", kind: "created" };
+
+  it("delivers kidock://changes payloads until unsubscribed", async () => {
+    mockIPC(() => {}, { shouldMockEvents: true });
+    const seen: unknown[] = [];
+    const off = tauriApi.onChanges((c) => seen.push(c));
+    await new Promise((r) => setTimeout(r, 0)); // let `listen` register
+
+    await emit("kidock://changes", [change]);
+    expect(seen).toEqual([[change]]);
+
+    off();
+    await emit("kidock://changes", [change]);
+    expect(seen).toHaveLength(1);
+  });
+
+  it("detaches even when unsubscribed before listen resolves", async () => {
+    mockIPC(() => {}, { shouldMockEvents: true });
+    const seen: unknown[] = [];
+    const off = tauriApi.onChanges((c) => seen.push(c));
+    off();
+    await new Promise((r) => setTimeout(r, 0));
+    await emit("kidock://changes", [change]);
+    expect(seen).toEqual([]);
   });
 });
 

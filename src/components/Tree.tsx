@@ -5,6 +5,8 @@ import { messageFor } from "./errors";
 
 type TreeProps = {
   projectId: number;
+  /** Bump to refetch every expanded level in place (expansion is kept). */
+  version?: number;
   selected: string | null;
   onSelect: (relPath: string) => void;
 };
@@ -21,6 +23,7 @@ export function Tree(props: TreeProps) {
 
 function DirChildren({
   projectId,
+  version = 0,
   rel,
   depth,
   selected,
@@ -31,7 +34,8 @@ function DirChildren({
 
   useEffect(() => {
     let cancelled = false;
-    setListing({ status: "loading" });
+    // On a refresh, keep showing the current entries until the new ones arrive.
+    setListing((prev) => (prev.status === "ok" ? prev : { status: "loading" }));
     api.listDir(projectId, rel).then(
       (entries) => !cancelled && setListing({ status: "ok", entries }),
       (error: unknown) => !cancelled && setListing({ status: "error", error }),
@@ -39,7 +43,7 @@ function DirChildren({
     return () => {
       cancelled = true;
     };
-  }, [api, projectId, rel]);
+  }, [api, projectId, rel, version]);
 
   const isRoot = rel === "";
 
@@ -61,6 +65,7 @@ function DirChildren({
     <TreeNode
       key={entry.relPath}
       projectId={projectId}
+      version={version}
       entry={entry}
       depth={depth}
       selected={selected}
@@ -80,6 +85,7 @@ function DirChildren({
 
 function TreeNode({
   projectId,
+  version,
   entry,
   depth,
   selected,
@@ -118,6 +124,7 @@ function TreeNode({
       {isDir && expanded && (
         <DirChildren
           projectId={projectId}
+          version={version}
           rel={entry.relPath}
           depth={depth + 1}
           selected={selected}

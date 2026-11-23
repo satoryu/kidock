@@ -3,18 +3,23 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::domain::{DomainError, ExclusionRules, Project, ProjectId, RootFolder};
+use crate::infra::detector::Msg;
 use crate::infra::fs_reader;
 use crate::infra::store::Store;
+use crate::infra::watcher::Watchers;
 
 /// Process-wide state managed by Tauri.
 ///
 /// `projects` caches the `projects` table so file commands don't touch SQLite.
-/// Writers take the `projects` write lock first, then the store, and keep both
-/// for the whole check-and-insert, so concurrent adds cannot race.
+/// Lock order: `projects` → `store` → `watchers`. Writers take the `projects`
+/// write lock first and keep it for the whole check-and-insert, so concurrent
+/// adds cannot race. The detector never holds two of these at once.
 #[derive(Debug)]
 pub struct AppState {
     store: Mutex<Store>,
     projects: RwLock<BTreeMap<ProjectId, Project>>,
+    /// Set once the detector thread runs (absent in unit tests).
+    watchers: Mutex<Option<Watchers>>,
     pub rules: ExclusionRules,
 }
 
@@ -42,8 +47,35 @@ impl AppState {
         Ok(Self {
             store: Mutex::new(store),
             projects: RwLock::new(projects),
+            watchers: Mutex::new(None),
             rules: ExclusionRules::default(),
         })
+    }
+
+    pub fn set_watchers(&self, watchers: Watchers) {
+        *self.watchers.lock().expect("watchers lock poisoned") = Some(watchers);
+    }
+
+    /// Takes a silent baseline of a newly added project, then watches it.
+    /// The detector queue is serial, so the baseline precedes any events.
+    pub fn watch_new_project(&self, project: &Project) -> Result<(), DomainError> {
+        let mut guard = self.watchers.lock().expect("watchers lock poisoned");
+        let Some(w) = guard.as_mut() else {
+            return Ok(());
+        };
+        w.send(Msg::Baseline(project.id));
+        w.start(project.id, &project.folder.canonical_path)
+    }
+
+    pub fn unwatch_project(&self, id: ProjectId) {
+        if let Some(w) = self
+            .watchers
+            .lock()
+            .expect("watchers lock poisoned")
+            .as_mut()
+        {
+            w.stop(id);
+        }
     }
 
     /// A clone of the project, so no lock is held during file I/O.

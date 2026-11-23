@@ -56,6 +56,16 @@ impl RelPath {
         self.components.last().map(String::as_str)
     }
 
+    /// The path's components, in order.
+    pub fn components(&self) -> &[String] {
+        &self.components
+    }
+
+    /// True if `prefix` is this path or one of its ancestors (component-wise).
+    pub fn starts_with(&self, prefix: &RelPath) -> bool {
+        self.components.starts_with(&prefix.components)
+    }
+
     /// `/`-separated form used across IPC.
     pub fn to_wire(&self) -> String {
         self.components.join("/")
