@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tauri::{Builder, Manager, Runtime};
 
 use infra::detector::{Detector, Msg};
-use infra::sink::TauriSink;
+use infra::sink::AppSink;
 use infra::watcher::{DEBOUNCE, Watchers};
 
 /// File name of the SQLite database inside the app data directory.
@@ -27,6 +27,10 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::remove_project,
         commands::list_dir,
         commands::read_markdown,
+        commands::list_inbox,
+        commands::inbox_counts,
+        commands::mark_read,
+        commands::mark_all_read,
     ])
 }
 
@@ -40,7 +44,7 @@ pub fn run() {
             let store = infra::store::Store::open(&dir.join(DB_FILE))?;
             let state = Arc::new(state::AppState::load(store)?);
 
-            let sink = Arc::new(TauriSink::new(app.handle().clone()));
+            let sink = Arc::new(AppSink::new(Arc::downgrade(&state), app.handle().clone()));
             let mut watchers = Watchers::new(Detector::new(state.clone(), sink).spawn(), DEBOUNCE);
             let available: Vec<_> = state
                 .projects_read()

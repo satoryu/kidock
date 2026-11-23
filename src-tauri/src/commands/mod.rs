@@ -18,8 +18,12 @@ pub use error::CommandError;
 use crate::domain::{
     DomainError, EntryKind, Project, ProjectId, RelPath, TreeEntry, check_overlap, project_name,
 };
+use crate::infra::store::{InboxRow, UnreadCounts};
 use crate::infra::{asset_scope, fs_reader};
 use crate::state::AppState;
+
+/// How many Inbox items are listed (older ones are kept and counted).
+pub const INBOX_LIMIT: usize = 500;
 
 /// File systems on these platforms are case-insensitive by default.
 const CASE_INSENSITIVE_FS: bool = cfg!(any(windows, target_os = "macos"));
@@ -39,6 +43,61 @@ pub struct TreeEntryDto {
     pub name: String,
     pub rel_path: String,
     pub kind: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxItemDto {
+    pub project_id: i64,
+    pub project_name: String,
+    pub rel_path: String,
+    pub kind: &'static str,
+    /// Milliseconds since the Unix epoch.
+    pub changed_at: i64,
+    pub read: bool,
+}
+
+impl From<InboxRow> for InboxItemDto {
+    fn from(r: InboxRow) -> Self {
+        Self {
+            project_id: r.project.0,
+            project_name: r.project_name,
+            rel_path: r.rel_path,
+            kind: r.kind.as_str(),
+            changed_at: r.changed_at_ms,
+            read: r.read,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUnreadDto {
+    pub project_id: i64,
+    pub unread: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxCountsDto {
+    pub total: u64,
+    pub by_project: Vec<ProjectUnreadDto>,
+}
+
+impl From<UnreadCounts> for InboxCountsDto {
+    fn from(c: UnreadCounts) -> Self {
+        Self {
+            total: c.total,
+            by_project: c
+                .by_project
+                .into_iter()
+                .map(|(id, unread)| ProjectUnreadDto {
+                    project_id: id.0,
+                    unread,
+                })
+                .collect(),
+        }
+    }
 }
 
 impl From<&Project> for ProjectInfo {
@@ -148,6 +207,25 @@ pub fn do_read_markdown(
     Ok(fs_reader::read_markdown(&project.folder, &rel)?)
 }
 
+pub fn do_list_inbox(state: &AppState) -> Result<Vec<InboxItemDto>, CommandError> {
+    let rows = state.store().list_inbox(INBOX_LIMIT)?;
+    Ok(rows.into_iter().map(InboxItemDto::from).collect())
+}
+
+pub fn do_inbox_counts(state: &AppState) -> Result<InboxCountsDto, CommandError> {
+    Ok(state.store().unread_counts()?.into())
+}
+
+/// Marks a file's Inbox item read; `false` if it had none or was already read.
+pub fn do_mark_read(state: &AppState, id: ProjectId, rel: &str) -> Result<bool, CommandError> {
+    let rel = RelPath::parse(rel)?;
+    Ok(state.store().mark_read(id, &rel.to_wire())?)
+}
+
+pub fn do_mark_all_read(state: &AppState) -> Result<usize, CommandError> {
+    Ok(state.store().mark_all_read()?)
+}
+
 fn project_and_rel(
     state: &AppState,
     id: ProjectId,
@@ -204,6 +282,30 @@ pub fn read_markdown(
     rel: String,
 ) -> Result<String, CommandError> {
     do_read_markdown(&state, ProjectId(project_id), &rel)
+}
+
+#[tauri::command(async)]
+pub fn list_inbox(state: State<'_, Arc<AppState>>) -> Result<Vec<InboxItemDto>, CommandError> {
+    do_list_inbox(&state)
+}
+
+#[tauri::command(async)]
+pub fn inbox_counts(state: State<'_, Arc<AppState>>) -> Result<InboxCountsDto, CommandError> {
+    do_inbox_counts(&state)
+}
+
+#[tauri::command(async)]
+pub fn mark_read(
+    state: State<'_, Arc<AppState>>,
+    project_id: i64,
+    rel: String,
+) -> Result<bool, CommandError> {
+    do_mark_read(&state, ProjectId(project_id), &rel)
+}
+
+#[tauri::command(async)]
+pub fn mark_all_read(state: State<'_, Arc<AppState>>) -> Result<usize, CommandError> {
+    do_mark_all_read(&state)
 }
 
 #[cfg(test)]
@@ -402,6 +504,64 @@ mod tests {
             do_read_markdown(&state, p.id, "C:/x.md").unwrap_err().kind,
             "InvalidPath"
         );
+    }
+
+    #[test]
+    fn inbox_commands_list_count_and_mark_read() {
+        use crate::domain::{ChangeKind, ProjectChange};
+        let parent = TempDir::new().unwrap();
+        let (a, b) = (parent.path().join("a"), parent.path().join("b"));
+        fs::create_dir(&a).unwrap();
+        fs::create_dir(&b).unwrap();
+        let state = state();
+        let pa = do_add_project(&state, Some("A"), &a).unwrap();
+        let pb = do_add_project(&state, Some("B"), &b).unwrap();
+        let ch = |p: ProjectId, rel: &str| ProjectChange {
+            project: p,
+            rel: RelPath::parse(rel).unwrap(),
+            kind: ChangeKind::Created,
+        };
+        state
+            .store()
+            .record_changes(&[ch(pa.id, "x.md"), ch(pa.id, "docs/y.md")], 1)
+            .unwrap();
+        state
+            .store()
+            .record_changes(&[ch(pb.id, "z.md")], 2)
+            .unwrap();
+
+        let list = do_list_inbox(&state).unwrap();
+        assert_eq!(list[0].rel_path, "z.md");
+        assert_eq!(list[0].project_name, "B");
+        assert_eq!(do_inbox_counts(&state).unwrap().total, 3);
+
+        assert!(do_mark_read(&state, pa.id, "docs/y.md").unwrap());
+        assert!(!do_mark_read(&state, pa.id, "docs/y.md").unwrap());
+        assert_eq!(
+            do_mark_read(&state, pa.id, "../escape.md")
+                .unwrap_err()
+                .kind,
+            "OutsideRoot"
+        );
+        let counts = do_inbox_counts(&state).unwrap();
+        assert_eq!(counts.total, 2);
+        assert_eq!(
+            counts.by_project,
+            [
+                ProjectUnreadDto {
+                    project_id: pa.id.0,
+                    unread: 1
+                },
+                ProjectUnreadDto {
+                    project_id: pb.id.0,
+                    unread: 1
+                },
+            ]
+        );
+
+        assert_eq!(do_mark_all_read(&state).unwrap(), 2);
+        do_remove_project(&state, pa.id).unwrap();
+        assert_eq!(do_list_inbox(&state).unwrap().len(), 1);
     }
 
     #[test]

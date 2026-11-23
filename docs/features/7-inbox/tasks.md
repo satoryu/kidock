@@ -4,10 +4,10 @@ Complete in order, with TDD for logic.
 
 ## 1. Backend
 
-- [ ] 1.1 `domain::inbox::apply` (all table rows).
-- [ ] 1.2 Store migration v3 and `record_changes` / `list_inbox` / `unread_counts` / `mark_read` / `mark_all_read` (incl. cascade on project removal, ordering, limit).
-- [ ] 1.3 `AppSink` (record, then emit). Detector integration test: changes land in the Inbox, and the baseline records nothing.
-- [ ] 1.4 Commands + IPC test.
+- [x] 1.1 `domain::inbox::apply` (all table rows).
+- [x] 1.2 Store migration v3 and `record_changes` / `list_inbox` / `unread_counts` / `mark_read` / `mark_all_read` (incl. cascade on project removal, ordering, limit).
+- [x] 1.3 `AppSink` (record, then emit). Detector integration test: changes land in the Inbox, and the baseline records nothing.
+- [x] 1.4 Commands + IPC test.
 
 ## 2. Frontend
 
