@@ -12,7 +12,10 @@ export async function loadApi(): Promise<KidockApi> {
       import("./mockApi"),
       import("./sampleFiles"),
     ]);
-    return createMockApi(sampleSeed, { delayMs: 150 });
+    const api = createMockApi(sampleSeed, { delayMs: 150 });
+    // Lets browser checks simulate backend events (mock mode only, never shipped).
+    (window as unknown as { __kidockMock?: typeof api }).__kidockMock = api;
+    return api;
   }
   return tauriApi;
 }
