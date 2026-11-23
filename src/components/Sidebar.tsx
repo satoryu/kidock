@@ -11,6 +11,8 @@ type Props = {
   onSelectProject: (id: number) => void;
   onAddProject: () => void;
   onDeleteProject: (project: ProjectInfo) => void;
+  notificationsEnabled: boolean;
+  onToggleNotifications: () => void;
 };
 
 /**
@@ -34,6 +36,8 @@ export function Sidebar({
   onSelectProject,
   onAddProject,
   onDeleteProject,
+  notificationsEnabled,
+  onToggleNotifications,
 }: Props) {
   const inboxSelected = view.kind === "inbox";
 
@@ -95,6 +99,19 @@ export function Sidebar({
           })}
         </ul>
       )}
+
+      <div className="sidebar-footer">
+        <button
+          type="button"
+          className="footer-toggle"
+          aria-pressed={notificationsEnabled}
+          title={notificationsEnabled ? "Turn OS notifications off" : "Turn OS notifications on"}
+          onClick={onToggleNotifications}
+        >
+          <span aria-hidden="true">{notificationsEnabled ? "🔔" : "🔕"}</span>
+          Notifications {notificationsEnabled ? "on" : "off"}
+        </button>
+      </div>
     </nav>
   );
 }

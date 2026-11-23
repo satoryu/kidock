@@ -3,6 +3,7 @@ import {
   type FileChange,
   type InboxItem,
   type KidockApi,
+  type OpenRequest,
   type ProjectInfo,
   type TreeEntry,
 } from "./types";
@@ -41,6 +42,8 @@ export type MockApi = KidockApi & {
    * records them in the Inbox (same rules as the backend), then notifies.
    */
   emitChanges(changes: Array<FileChange & { content?: string }>, nowMs?: number): void;
+  /** Simulates a click on an OS notification. */
+  emitOpenRequest(request: OpenRequest): void;
 };
 
 /**
@@ -66,6 +69,8 @@ export function createMockApi(
   }
 
   const listeners = new Set<(changes: FileChange[]) => void>();
+  const openListeners = new Set<(request: OpenRequest) => void>();
+  let notificationsEnabled = true;
   type Item = Omit<InboxItem, "projectName">;
   const inbox = new Map<string, Item>();
   const key = (projectId: number, relPath: string) => `${projectId}\n${relPath}`;
@@ -201,6 +206,25 @@ export function createMockApi(
           a.name.toLowerCase().localeCompare(b.name.toLowerCase()) ||
           (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
       );
+    },
+
+    async getNotificationsEnabled() {
+      await wait();
+      return notificationsEnabled;
+    },
+
+    async setNotificationsEnabled(enabled) {
+      await wait();
+      notificationsEnabled = enabled;
+    },
+
+    onOpenRequest(handler) {
+      openListeners.add(handler);
+      return () => openListeners.delete(handler);
+    },
+
+    emitOpenRequest(request) {
+      for (const l of openListeners) l(request);
     },
 
     onChanges(handler) {

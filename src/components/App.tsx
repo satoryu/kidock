@@ -22,6 +22,17 @@ export function App() {
   const [treeVersion, setTreeVersion] = useState(0);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [counts, setCounts] = useState<InboxCounts>({ total: 0, byProject: [] });
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  useEffect(() => {
+    api.getNotificationsEnabled().then(setNotificationsEnabled, () => {});
+  }, [api]);
+
+  async function toggleNotifications() {
+    const next = !notificationsEnabled;
+    setNotificationsEnabled(next);
+    await api.setNotificationsEnabled(next).catch(() => setNotificationsEnabled(!next));
+  }
 
   const refreshInbox = useCallback(
     () =>
@@ -55,6 +66,19 @@ export function App() {
     [api, refreshInbox],
   );
 
+  // A click on an OS notification: show the Inbox, and open the file if any.
+  const openRef = useRef<(file: OpenFile) => void>(() => {});
+  useEffect(
+    () =>
+      api.onOpenRequest((request) => {
+        setView({ kind: "inbox" });
+        if (request.projectId !== null) {
+          openRef.current({ projectId: request.projectId, relPath: request.relPath });
+        }
+      }),
+    [api],
+  );
+
   /** Opens a file and marks its Inbox item read (if it has one). */
   function open(file: OpenFile) {
     setOpenFile(file);
@@ -70,6 +94,8 @@ export function App() {
       () => void refreshInbox(),
     );
   }
+
+  openRef.current = open;
 
   async function markAllRead() {
     await api.markAllRead().catch(() => 0);
@@ -135,6 +161,8 @@ export function App() {
           onSelectProject={selectProject}
           onAddProject={() => setDialog({ kind: "add" })}
           onDeleteProject={(project) => setDialog({ kind: "delete", project })}
+          notificationsEnabled={notificationsEnabled}
+          onToggleNotifications={() => void toggleNotifications()}
         />
         {loadError && (
           <div className="sidebar-error" role="alert">

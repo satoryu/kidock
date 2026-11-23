@@ -122,6 +122,33 @@ describe("tauriApi.onChanges", () => {
   });
 });
 
+describe("tauriApi notifications", () => {
+  it("gets and sets the toggle", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return cmd === "get_notifications_enabled" ? false : null;
+    });
+    await expect(tauriApi.getNotificationsEnabled()).resolves.toBe(false);
+    await expect(tauriApi.setNotificationsEnabled(true)).resolves.toBeUndefined();
+    expect(calls).toEqual([
+      { cmd: "get_notifications_enabled", payload: {} },
+      { cmd: "set_notifications_enabled", payload: { enabled: true } },
+    ]);
+  });
+
+  it("delivers kidock://open requests", async () => {
+    mockIPC(() => {}, { shouldMockEvents: true });
+    const seen: unknown[] = [];
+    const off = tauriApi.onOpenRequest((r) => seen.push(r));
+    await new Promise((r) => setTimeout(r, 0));
+    await emit("kidock://open", { projectId: 2, relPath: "a.md" });
+    off();
+    await emit("kidock://open", { projectId: null, relPath: null });
+    expect(seen).toEqual([{ projectId: 2, relPath: "a.md" }]);
+  });
+});
+
 describe("toKidockError", () => {
   it("maps unknown kinds and non-object errors to Unknown", () => {
     expect(toKidockError({ kind: "Weird", message: "m" })).toMatchObject({

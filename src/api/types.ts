@@ -40,6 +40,9 @@ export type InboxCounts = {
   byProject: Array<{ projectId: number; unread: number }>;
 };
 
+/** Sent when an OS notification is clicked: open a file, or just the Inbox. */
+export type OpenRequest = { projectId: number; relPath: string } | { projectId: null; relPath: null };
+
 /** Mirrors `CommandError.kind` on the Rust side, plus `Unknown` for unexpected failures. */
 export type ErrorKind =
   | "ProjectNotFound"
@@ -84,6 +87,10 @@ export interface KidockApi {
   /** Marks a file's Inbox item read; resolves `false` if it had none or was read. */
   markRead(projectId: number, relPath: string): Promise<boolean>;
   markAllRead(): Promise<number>;
+  getNotificationsEnabled(): Promise<boolean>;
+  setNotificationsEnabled(enabled: boolean): Promise<void>;
+  /** Subscribes to "open this" requests from notification clicks. */
+  onOpenRequest(handler: (request: OpenRequest) => void): () => void;
   /** Subscribes to batches of detected changes. Returns an unsubscribe function. */
   onChanges(handler: (changes: FileChange[]) => void): () => void;
 }

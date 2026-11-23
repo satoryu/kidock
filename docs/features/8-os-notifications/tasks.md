@@ -12,10 +12,10 @@ Complete in order, with TDD for logic.
 
 ## 2. Frontend
 
-- [ ] 2.1 API (`tauriApi`, mock): toggle and `onOpenRequest`.
-- [ ] 2.2 Sidebar bell toggle; `App` handles open requests.
+- [x] 2.1 API (`tauriApi`, mock): toggle and `onOpenRequest`.
+- [x] 2.2 Sidebar bell toggle; `App` handles open requests.
 
 ## 3. Verification and docs
 
-- [ ] 3.1 All checks pass. Real app on macOS: a notification appears for a new file while unfocused, a burst gives one summary, the toggle persists, a click opens the file. Windows appearance/click: owner check.
+- [x] 3.1 All checks pass. Real app on macOS: a notification appears for a new file while unfocused, a burst gives one summary, the toggle persists, a click opens the file. Windows appearance/click: owner check. → 121 Rust unit tests (notice wording, coalescing with a fake presenter, settings) + IPC + watcher tests; 157 frontend tests. Real app (`tauri dev`, macOS): schema v4; a single change and a 5-file burst reached the Inbox and the notifier with no errors. Whether a banner appears, how it looks, and what a click does cannot be observed here (no screen access): **owner check** on macOS and Windows.
 - [ ] 3.2 `CLAUDE.md`, PR, self-review, merge through the CI gate.
