@@ -1,0 +1,108 @@
+import { useEffect, useState, type KeyboardEvent } from "react";
+import { useApi } from "../api/context";
+import type { TreeEntry } from "../api/types";
+import { messageFor } from "./errors";
+
+type TreeProps = {
+  selected: string | null;
+  onSelect: (relPath: string) => void;
+};
+
+type Listing =
+  | { status: "loading" }
+  | { status: "ok"; entries: TreeEntry[] }
+  | { status: "error"; error: unknown };
+
+/** Sidebar tree of the current root. Each directory level is fetched on demand. */
+export function Tree(props: TreeProps) {
+  return <DirChildren rel="" depth={0} {...props} />;
+}
+
+function DirChildren({ rel, depth, selected, onSelect }: TreeProps & { rel: string; depth: number }) {
+  const api = useApi();
+  const [listing, setListing] = useState<Listing>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setListing({ status: "loading" });
+    api.listDir(rel).then(
+      (entries) => !cancelled && setListing({ status: "ok", entries }),
+      (error: unknown) => !cancelled && setListing({ status: "error", error }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, rel]);
+
+  const isRoot = rel === "";
+
+  if (listing.status === "loading") {
+    return <div className="tree-status">Loading…</div>;
+  }
+  if (listing.status === "error") {
+    return (
+      <div className="tree-status tree-error" role="alert">
+        {messageFor(listing.error)}
+      </div>
+    );
+  }
+  if (isRoot && listing.entries.length === 0) {
+    return <div className="tree-status">No Markdown files in this folder.</div>;
+  }
+
+  const items = listing.entries.map((entry) => (
+    <TreeNode key={entry.relPath} entry={entry} depth={depth} selected={selected} onSelect={onSelect} />
+  ));
+  return isRoot ? (
+    <ul className="tree" role="tree" aria-label="Files">
+      {items}
+    </ul>
+  ) : (
+    <ul className="tree-group" role="group">
+      {items}
+    </ul>
+  );
+}
+
+function TreeNode({
+  entry,
+  depth,
+  selected,
+  onSelect,
+}: TreeProps & { entry: TreeEntry; depth: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const isDir = entry.kind === "dir";
+  const isSelected = !isDir && entry.relPath === selected;
+
+  const activate = () => (isDir ? setExpanded((v) => !v) : onSelect(entry.relPath));
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  };
+
+  return (
+    <li role="none">
+      <div
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={isDir ? expanded : undefined}
+        aria-selected={isDir ? undefined : isSelected}
+        className={`tree-item ${isDir ? "is-dir" : "is-file"}${isSelected ? " is-selected" : ""}`}
+        style={{ "--depth": depth } as React.CSSProperties}
+        title={entry.relPath}
+        onClick={activate}
+        onKeyDown={onKeyDown}
+      >
+        <span className="tree-icon" aria-hidden="true">
+          {isDir ? (expanded ? "▾" : "▸") : "📄"}
+        </span>
+        <span className="tree-label">{entry.name}</span>
+      </div>
+      {isDir && expanded && (
+        <DirChildren rel={entry.relPath} depth={depth + 1} selected={selected} onSelect={onSelect} />
+      )}
+    </li>
+  );
+}

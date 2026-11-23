@@ -1,0 +1,255 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --sidebar-bg: #f6f8fa;
+  --hover: #eaeef2;
+  --selected: #ddf4ff;
+  --accent: #0969da;
+  --danger: #d1242f;
+  --code-bg: #f6f8fa;
+  color-scheme: light dark;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
+    sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --border: #3d444d;
+    --sidebar-bg: #151b23;
+    --hover: #212830;
+    --selected: #1f3a5f;
+    --accent: #4493f8;
+    --danger: #f85149;
+    --code-bg: #151b23;
+  }
+  /* Shiki dual-theme output: switch to the dark variables. */
+  .shiki,
+  .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* The window itself never scrolls; the sidebar tree and the viewer scroll
+   independently. */
+body {
+  overflow: hidden;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  /* minmax(0, …) stops the row from growing to fit its content. */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header button {
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.sidebar-header button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.root-name {
+  margin-top: 8px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-error {
+  margin: 8px 12px 0;
+  color: var(--danger);
+}
+
+.sidebar-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.tree,
+.tree-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-item {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 8px 2px calc(8px + var(--depth, 0) * 14px);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tree-item:hover {
+  background: var(--hover);
+}
+
+.tree-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tree-item.is-selected {
+  background: var(--selected);
+}
+
+.tree-icon {
+  flex: none;
+  width: 1.2em;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-status {
+  padding: 4px 12px;
+  color: var(--muted);
+}
+
+.tree-error {
+  color: var(--danger);
+}
+
+/* ---- Viewer ---- */
+.content {
+  min-width: 0;
+  overflow: auto;
+}
+
+.viewer-message {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted);
+}
+
+.viewer-error {
+  color: var(--danger);
+}
+
+.markdown-body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 32px 64px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.markdown-body a {
+  color: var(--accent);
+}
+
+.markdown-body h1,
+.markdown-body h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  display: block;
+  overflow: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 13px;
+  border: 1px solid var(--border);
+}
+
+.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.markdown-body :not(pre) > code {
+  padding: 0.2em 0.4em;
+  background: var(--code-bg);
+  border-radius: 6px;
+}
+
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  background: var(--code-bg);
+  border-radius: 6px;
+  line-height: 1.45;
+}
+
+.markdown-body blockquote {
+  margin: 0;
+  padding: 0 1em;
+  color: var(--muted);
+  border-left: 0.25em solid var(--border);
+}
+
+.markdown-body img {
+  max-width: 100%;
+}
+
+.markdown-body li.task-list-item {
+  list-style: none;
+}
+
+.markdown-body li.task-list-item input {
+  margin: 0 0.4em 0 -1.4em;
+  vertical-align: middle;
+}

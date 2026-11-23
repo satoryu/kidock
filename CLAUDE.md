@@ -40,21 +40,23 @@ These apply to every Issue. Revisit them when designing anything that touches fi
 
 ## Tech Stacks
 
-> **Not finalized.** The stack below is the working assumption. It will be decided in the `design.md` of Issue #1; update this section when it is.
+Decided in [`docs/features/1-scaffold-folder-tree-render/design.md`](docs/features/1-scaffold-folder-tree-render/design.md) (rationale there).
 
-- **Tauri v2** + Rust backend
-- Frontend: Vite + TypeScript (React or Svelte — TBD)
-- File watching: `notify` + `notify-debouncer-full` (Rust side)
-- Markdown: markdown-it (or equivalent) + mermaid + shiki
-- State persistence: `tauri-plugin-store` or SQLite — TBD
-- Notifications: `tauri-plugin-notification`
+- **Tauri 2.12.x** + Rust (edition 2024, MSRV 1.90). Tauri 3 is alpha; do not use it.
+- Frontend: **React 19 + TypeScript 7 + Vite 8**, npm. Node `^20.19.0 || >=22.12.0`.
+- Markdown: **markdown-it** (GFM; task lists via our own `src/markdown/taskLists.ts`) → **Shiki 4** (core build, JavaScript regex engine, curated languages) → **DOMPurify** (`src/markdown/sanitize.ts`).
+- Mermaid: `mermaid` (introduced in #5).
+- File access: Kidock's own Rust commands (no `tauri-plugin-fs`). Folder picker: `tauri-plugin-dialog`.
+- File watching: `notify` + `notify-debouncer-full` (introduced in #3).
+- State persistence: SQLite via `rusqlite` (bundled), owned by the Rust backend (introduced in #3).
+- Notifications: `tauri-plugin-notification` (introduced in #4).
 
 ## Workflow
 
 0. Create a development environment to work on the issue (a `feature/...` branch from `main`, see Branching Strategy).
-1. Analyze the user's request in the issue and write down the requirements in the document `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`.
-2. Design the architecture and write it down in `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`.
-3. Plan the implementation tasks and create a checklist in `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`.
+1. Analyze the user's request in the issue and write down the requirements in the document `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`.
+2. Design the architecture and write it down in `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`.
+3. Plan the implementation tasks and create a checklist in `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`.
 4. You must be approved by the user before starting the implementation.
 5. Implement the tasks one by one, following TDD principles after approval.
 6. After completing the implementation, create a pull request to merge the feature branch into the `main` branch.
@@ -62,7 +64,7 @@ These apply to every Issue. Revisit them when designing anything that touches fi
 
 ## Documents
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`
 
 This document contains the requirements for the issue number `[ISSUE-NUMBER]`, including the following sections:
 
@@ -72,7 +74,7 @@ This document contains the requirements for the issue number `[ISSUE-NUMBER]`, i
 - Acceptance Criteria
 - User Stories
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`
 
 This document contains the design for the issue number `[ISSUE-NUMBER]`, including the following sections:
 
@@ -83,7 +85,7 @@ This document contains the design for the issue number `[ISSUE-NUMBER]`, includi
 
 The diagrams should be created using [Mermaid](https://mermaid.js.org/) syntax.
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`
 
 This document contains the implementation tasks for the issue number `[ISSUE-NUMBER]`, including a checklist of tasks to be completed.
 
@@ -94,14 +96,15 @@ You must complete each task in order and check them off as you complete them.
 You must follow TDD (Test-Driven Development) principles when implementing the tasks.
 This means you must write todos to complete the task first, then write a test that fails, and finally implement the code to make the test pass. Then refactor the code if necessary.
 
-### Layering (policy; finalize in Issue #1)
+### Layering
 
-- **Rust backend**: `domain` / `infra` / `commands`.
+- **Rust backend** (`src-tauri/src/`): `domain` / `infra` / `commands` (+ `state.rs`).
   - `domain`: pure logic (change detection, unread state, exclusion rules, path normalization). No Tauri, no filesystem I/O.
   - `infra`: adapters for the filesystem, `notify`, persistence, and OS notifications.
-  - `commands`: thin Tauri command / event handlers that wire `infra` to `domain`.
+  - `commands`: thin Tauri command / event handlers that wire `infra` to `domain`. Each `#[tauri::command]` delegates to a plain `do_*` function taking `&AppState`, so it is testable without a Tauri runtime.
   - Keep dependencies pointing inward: `commands` and `infra` may depend on `domain`, but `domain` must not depend on the outer layers.
-- **Frontend**: isolate all Tauri IPC calls behind a single API module so components can be tested (and run in a browser) with a mock implementation.
+- **Frontend** (`src/`): all backend access goes through the `KidockApi` interface (`src/api/`), provided via React context (`ApiProvider` / `useApi`). `tauriApi` is the real implementation; `mockApi` is used in tests and in browser dev. Components never import `@tauri-apps/api` directly.
+- **Path rule**: the frontend sends an absolute path only once (to `set_root`, from the folder dialog). Every other request uses a `/`-separated path relative to the root, validated by `RelPath` and checked again after canonicalization.
 
 ## Testing
 
@@ -109,14 +112,18 @@ This means you must write todos to complete the task first, then write a test th
 - **Frontend**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/), plus the TypeScript type-check.
 
 ```bash
-# TODO: replace with the actual commands after scaffolding (Issue #1).
-# e.g.
-# cargo test --manifest-path src-tauri/Cargo.toml
-# cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-# cargo fmt --manifest-path src-tauri/Cargo.toml --check
-# npm test
-# npx tsc --noEmit
+# Rust (run from the repo root)
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+# Frontend
+npm test            # run the whole suite once
+npm run test:watch  # watch mode
+npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
 ```
+
+IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`.
 
 ## Branching Strategy
 
@@ -144,8 +151,8 @@ When issues are found during code review, do not dismiss them solely because the
 
 When the Test Plan includes manual verification items, you must perform the verification yourself as far as the environment allows. Only hand an item to the user when it genuinely cannot be done here, and then give them exact steps and the expected result.
 
-1. **Frontend in a browser (fast loop)**: run the frontend alone on the Vite dev server with the IPC API module swapped for a mock (fake folders, fake file events). Verify layout, tree behavior, unread badges, and rendering (GFM, code highlighting, Mermaid, relative images/links) with the Chrome integration tools. This does not exercise Rust, the real filesystem, or OS integration.
-2. **Real app**: run the app via the Tauri dev command (TODO: fill in after scaffolding) and verify end to end. On macOS, use computer-use to drive the native window when needed.
+1. **Frontend in a browser (fast loop)**: `npm run dev:mock` serves the UI at `http://localhost:1420` with the in-memory mock API (`.env.mock` sets `VITE_API_MOCK=true`; sample content lives in `src/api/sampleFiles.ts`, including an XSS sample and a 1,000-file directory). Verify layout, tree behavior, unread badges, and rendering (GFM, code highlighting, Mermaid, relative images/links) with the Chrome integration tools. This does not exercise Rust, the real filesystem, or OS integration.
+2. **Real app**: `npm run tauri dev` and verify end to end. On macOS, use computer-use to drive the native window when needed.
 3. **File-watching scenario** — use a disposable verification folder (e.g. under the scratchpad), register it in the app, then:
    1. Create a new `.md` → unread mark + folder badge increments + one OS notification.
    2. Overwrite an existing `.md` in place → marked unread again; if it is open, it re-renders and keeps scroll position.
@@ -185,7 +192,9 @@ Merging is not the end of the work. An Issue/PR is done only when all of the fol
 - **Atomic saves look like create/remove/rename sequences**, and the exact sequence differs per OS and per editor/agent. Never infer "updated" from a single event kind; debounce, then compare path + mtime/size (and hash if needed) against the last known state.
 - **The watcher can fire for the temp file before the rename**: temp files must be filtered by the exclusion rules, not shown in the tree or counted as unread.
 - **Markdown is untrusted**: raw HTML, `javascript:` URLs, SVG with scripts, and Mermaid labels are all attack surfaces. Sanitize after rendering, keep the CSP strict, and never widen the asset protocol scope beyond the registered folders (no `**` on the whole filesystem).
+- **The CSP is not applied in desktop `tauri dev`**: the WebView loads the Vite dev server URL directly (Tauri 2.12 proxies dev requests, and thus applies the CSP, only on mobile). Verify CSP-sensitive changes with a built app (`npm run tauri build -- --debug`), or by serving a build with the same CSP header. Chrome reports `script-src-attr` violations when *parsing* HTML that contains inline handlers (e.g. DOMPurify's `DOMParser` step) even though nothing executes; check the final DOM rather than treating such a report as a sanitizer failure.
 - **Relative paths resolve against the `.md` file's directory**, not the registered folder root or the app's CWD. Reject resolved paths that escape the registered folders.
 - **Path comparison**: normalize separators and casing rules in one place; never compare raw path strings across the IPC boundary. Windows paths may also come with the `\\?\` prefix after canonicalization.
 - **Large trees**: do not send the full recursive tree over IPC in one payload; load children lazily.
+- **Sync Tauri commands run on the main thread**: a plain `#[tauri::command] fn` blocks the UI while it does I/O. Declare I/O commands as `#[tauri::command(async)]` (runs a sync fn on the thread pool) or as `async fn` (verified in tauri-macros 2.7 `command/wrapper.rs`).
 - **Do not use `git add -A`** (or `git add --all` / `git add .`): always stage explicit paths. TODO: enforce with a PreToolUse hook in `.claude/settings.json` (planned in a later Issue).
