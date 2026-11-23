@@ -40,7 +40,7 @@ These apply to every Issue. Revisit them when designing anything that touches fi
 
 ## Tech Stacks
 
-Decided in [`docs/1-scaffold-folder-tree-render/design.md`](docs/1-scaffold-folder-tree-render/design.md) (rationale there).
+Decided in [`docs/features/1-scaffold-folder-tree-render/design.md`](docs/features/1-scaffold-folder-tree-render/design.md) (rationale there).
 
 - **Tauri 2.12.x** + Rust (edition 2024, MSRV 1.90). Tauri 3 is alpha; do not use it.
 - Frontend: **React 19 + TypeScript 7 + Vite 8**, npm. Node `^20.19.0 || >=22.12.0`.
@@ -54,9 +54,9 @@ Decided in [`docs/1-scaffold-folder-tree-render/design.md`](docs/1-scaffold-fold
 ## Workflow
 
 0. Create a development environment to work on the issue (a `feature/...` branch from `main`, see Branching Strategy).
-1. Analyze the user's request in the issue and write down the requirements in the document `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`.
-2. Design the architecture and write it down in `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`.
-3. Plan the implementation tasks and create a checklist in `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`.
+1. Analyze the user's request in the issue and write down the requirements in the document `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`.
+2. Design the architecture and write it down in `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`.
+3. Plan the implementation tasks and create a checklist in `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`.
 4. You must be approved by the user before starting the implementation.
 5. Implement the tasks one by one, following TDD principles after approval.
 6. After completing the implementation, create a pull request to merge the feature branch into the `main` branch.
@@ -64,7 +64,7 @@ Decided in [`docs/1-scaffold-folder-tree-render/design.md`](docs/1-scaffold-fold
 
 ## Documents
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/requirements.md`
 
 This document contains the requirements for the issue number `[ISSUE-NUMBER]`, including the following sections:
 
@@ -74,7 +74,7 @@ This document contains the requirements for the issue number `[ISSUE-NUMBER]`, i
 - Acceptance Criteria
 - User Stories
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/design.md`
 
 This document contains the design for the issue number `[ISSUE-NUMBER]`, including the following sections:
 
@@ -85,7 +85,7 @@ This document contains the design for the issue number `[ISSUE-NUMBER]`, includi
 
 The diagrams should be created using [Mermaid](https://mermaid.js.org/) syntax.
 
-### `docs/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`
+### `docs/features/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]/tasks.md`
 
 This document contains the implementation tasks for the issue number `[ISSUE-NUMBER]`, including a checklist of tasks to be completed.
 
