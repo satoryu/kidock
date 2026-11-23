@@ -56,10 +56,12 @@ export function createMockApi(
 ): MockApi {
   type Entry = { info: ProjectInfo; files: Files };
   const projects = new Map<number, Entry>();
-  const folders = new Map(Object.entries(seed.folders ?? {}));
+  // Copies, so `emitChanges` never mutates the caller's fixtures.
+  const folders = new Map(Object.entries(seed.folders ?? {}).map(([k, v]) => [k, { ...v }]));
   let nextId = 1;
 
-  for (const p of seed.projects ?? []) {
+  for (const seeded of seed.projects ?? []) {
+    const p = { ...seeded, files: { ...seeded.files } };
     if (!folders.has(p.path)) folders.set(p.path, p.files);
     const id = nextId++;
     projects.set(id, {

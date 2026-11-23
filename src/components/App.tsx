@@ -51,17 +51,32 @@ export function App() {
     void refreshInbox();
   }, [refreshInbox]);
 
-  // On changes: refresh the Inbox, and the open tree if its project changed.
+  const [fileVersion, setFileVersion] = useState(0);
+
+  // On changes: refresh the Inbox, the open tree if its project changed, and
+  // the open file if it changed (re-rendered in place, scroll kept).
   const viewRef = useRef(view);
   viewRef.current = view;
+  const openFileRef = useRef(openFile);
+  openFileRef.current = openFile;
   useEffect(
     () =>
       api.onChanges((changes) => {
-        void refreshInbox();
         const v = viewRef.current;
         if (v.kind === "project" && changes.some((c) => c.projectId === v.id)) {
           setTreeVersion((n) => n + 1);
         }
+        const f = openFileRef.current;
+        const own = f && changes.find((c) => c.projectId === f.projectId && c.relPath === f.relPath);
+        if (own) {
+          setFileVersion((n) => n + 1);
+          // The owner is looking at it only if Kidock has focus.
+          if (own.kind !== "deleted" && document.hasFocus()) {
+            void api.markRead(own.projectId, own.relPath).finally(() => void refreshInbox());
+            return;
+          }
+        }
+        void refreshInbox();
       }),
     [api, refreshInbox],
   );
@@ -189,7 +204,7 @@ export function App() {
         )}
       </div>
       <main className="pane pane-main">
-        <Viewer file={openFile} placeholder={placeholder} />
+        <Viewer file={openFile} version={fileVersion} placeholder={placeholder} />
       </main>
 
       {dialog?.kind === "add" && (

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMockApi, type MockSeed } from "../api/mockApi";
@@ -287,6 +287,63 @@ describe("App", () => {
       await waitFor(() => expect(inboxRows()).toHaveLength(1));
       expect(inboxRows()[0]).toHaveTextContent("agent");
       expect(within(inboxButton()).getByLabelText("1 unread")).toBeInTheDocument();
+    });
+  });
+
+  describe("auto re-render of the open file", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    async function openReadme(api: ReturnType<typeof createMockApi>) {
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      await userEvent.click(projectButton("reports"));
+      await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+      await screen.findByRole("heading", { name: "Reports" });
+    }
+
+    it("re-renders when the open file changes, and marks it read while focused", async () => {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      const api = createMockApi(seed());
+      await openReadme(api);
+      act(() =>
+        api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "updated", content: "# Reports v2" }]),
+      );
+      expect(await screen.findByRole("heading", { name: "Reports v2" })).toBeInTheDocument();
+      await waitFor(async () => expect((await api.inboxCounts()).total).toBe(0));
+    });
+
+    it("leaves the update unread when the window is not focused", async () => {
+      vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      const api = createMockApi(seed());
+      await openReadme(api);
+      act(() =>
+        api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "updated", content: "# Reports v3" }]),
+      );
+      expect(await screen.findByRole("heading", { name: "Reports v3" })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 20));
+      expect((await api.inboxCounts()).total).toBe(1);
+    });
+
+    it("shows that the open file was deleted", async () => {
+      const api = createMockApi(seed());
+      await openReadme(api);
+      act(() => api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "deleted" }]));
+      expect(await screen.findByText(/no longer exists/i)).toBeInTheDocument();
+    });
+
+    it("ignores changes to other files", async () => {
+      const api = createMockApi(seed());
+      let reads = 0;
+      const read = api.readMarkdown;
+      api.readMarkdown = (...a) => {
+        reads++;
+        return read(...a);
+      };
+      await openReadme(api);
+      const before = reads;
+      act(() => api.emitChanges([{ projectId: 1, relPath: "notes/n.md", kind: "updated" }]));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(reads).toBe(before);
     });
   });
 
