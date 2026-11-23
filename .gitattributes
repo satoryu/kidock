@@ -1,0 +1,2 @@
+# Normalize line endings so formatters behave the same on Windows checkouts.
+* text=auto eol=lf

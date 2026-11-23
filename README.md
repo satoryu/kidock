@@ -1,5 +1,7 @@
 # Kidock
 
+[![CI](https://github.com/satoryu/kidock/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/satoryu/kidock/actions/workflows/ci.yml)
+
 Kidock — the dock where your agents' work arrives.
 
 > **Status: early development.** Nothing is usable yet, and features and the tech stack may change.
