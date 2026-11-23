@@ -9,6 +9,7 @@
 #![cfg(not(windows))]
 
 use std::fs;
+use std::sync::Arc;
 
 use kidock_lib::infra::store::Store;
 use kidock_lib::state::AppState;
@@ -22,7 +23,7 @@ use tauri::{App, WebviewWindow, WebviewWindowBuilder};
 use tempfile::TempDir;
 
 fn app() -> (App<MockRuntime>, WebviewWindow<MockRuntime>) {
-    let state = AppState::load(Store::open_in_memory().unwrap()).unwrap();
+    let state = Arc::new(AppState::load(Store::open_in_memory().unwrap()).unwrap());
     let app = kidock_lib::with_commands(mock_builder().manage(state))
         .build(mock_context(noop_assets()))
         .unwrap();

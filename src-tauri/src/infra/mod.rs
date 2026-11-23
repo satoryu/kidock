@@ -4,4 +4,6 @@ pub mod asset_scope;
 pub mod detector;
 pub mod fs_reader;
 pub mod scan;
+pub mod sink;
 pub mod store;
+pub mod watcher;
