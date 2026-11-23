@@ -1,4 +1,10 @@
-/// Which directory entries are hidden from the tree (and, from #3, from watching).
+use super::RelPath;
+
+/// Name suffixes of temp/backup files that editors and agents write before an
+/// atomic rename (compared ASCII case-insensitively).
+const TEMP_SUFFIXES: &[&str] = &["~", ".tmp", ".temp", ".swp", ".swo", ".part", ".crdownload"];
+
+/// Which directory entries are hidden from the tree and ignored by the watcher.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExclusionRules {
     /// Entry names excluded anywhere in the tree (compared ASCII case-insensitively,
@@ -21,7 +27,20 @@ impl ExclusionRules {
     pub fn is_excluded(&self, name: &str) -> bool {
         (self.exclude_hidden && name.starts_with('.'))
             || self.names.iter().any(|n| n.eq_ignore_ascii_case(name))
+            || is_temp_name(name)
     }
+}
+
+fn is_temp_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    TEMP_SUFFIXES.iter().any(|s| lower.ends_with(s))
+}
+
+/// True if `rel` is a Markdown file that Kidock tracks: no component is
+/// excluded and the file name is `.md`.
+pub fn is_tracked(rel: &RelPath, rules: &ExclusionRules) -> bool {
+    rel.file_name().is_some_and(is_markdown)
+        && rel.components().iter().all(|c| !rules.is_excluded(c))
 }
 
 /// True if `name` has a `.md` extension (case-insensitive).
@@ -45,6 +64,40 @@ mod tests {
         for name in ["notes", "report.md", "git", "modules"] {
             assert!(!rules.is_excluded(name), "{name}");
         }
+    }
+
+    #[test]
+    fn temp_and_backup_names_are_excluded() {
+        let rules = ExclusionRules::default();
+        for name in [
+            "report.md~",
+            "report.md.tmp",
+            "report.md.TMP",
+            "x.temp",
+            "a.swp",
+            "a.swo",
+            "big.md.part",
+            "dl.crdownload",
+        ] {
+            assert!(rules.is_excluded(name), "{name}");
+        }
+        assert!(!rules.is_excluded("tmp"));
+        assert!(!rules.is_excluded("report.md"));
+    }
+
+    #[test]
+    fn tracked_requires_markdown_and_no_excluded_component() {
+        let rules = ExclusionRules::default();
+        let t = |s: &str| is_tracked(&RelPath::parse(s).unwrap(), &rules);
+        assert!(t("report.md"));
+        assert!(t("notes/2026/a.MD"));
+        assert!(!t("report.txt"));
+        assert!(!t(".git/a.md"));
+        assert!(!t("docs/node_modules/x/readme.md"));
+        assert!(!t("docs/.hidden/a.md"));
+        assert!(!t(".a.md"));
+        assert!(!t("a.md.tmp"));
+        assert!(!t(""));
     }
 
     #[test]

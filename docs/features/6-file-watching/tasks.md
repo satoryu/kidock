@@ -4,15 +4,15 @@ Complete in order, with TDD for logic.
 
 ## 1. Domain
 
-- [ ] 1.1 `fnv1a64` (published test vectors).
-- [ ] 1.2 Temp/backup patterns in `ExclusionRules`; `is_tracked`.
-- [ ] 1.3 `FileState`, `ChangeKind`, `decide`, `needs_hash`.
+- [x] 1.1 `fnv1a64` (published test vectors).
+- [x] 1.2 Temp/backup patterns in `ExclusionRules`; `is_tracked`.
+- [x] 1.3 `FileState`, `ChangeKind`, `decide`, `needs_hash`.
 
 ## 2. Infra
 
-- [ ] 2.1 Store migration v2 (`files`, `projects.baselined`), file-state methods, v1 → v2 upgrade test, cascade on project delete.
-- [ ] 2.2 `scan::walk` / `scan::observe`.
-- [ ] 2.3 `Detector` (Paths / Baseline / Rescan / Forget) with a collecting sink; synthetic tests including directory removal and moves.
+- [x] 2.1 Store migration v2 (`files`, `projects.baselined`), file-state methods, v1 → v2 upgrade test, cascade on project delete.
+- [x] 2.2 `scan::walk` / `scan::observe`.
+- [x] 2.3 `Detector` (Paths / Baseline / Rescan / Forget) with a collecting sink; synthetic tests including directory removal and moves.
 - [ ] 2.4 `Watchers` (notify-debouncer-full) and `TauriSink`.
 - [ ] 2.5 Real-watcher integration tests (`tests/watch.rs`).
 
