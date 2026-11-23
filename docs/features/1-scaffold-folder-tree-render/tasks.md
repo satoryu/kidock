@@ -8,7 +8,7 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 - [x] 1.2 Remove template demo code (greet command, logos). Set the app name/identifier (`Kidock`, e.g. `io.github.satoryu.kidock`).
 - [x] 1.3 Create the Rust module skeleton: `domain/`, `infra/`, `commands/`, `state.rs`.
 - [x] 1.4 Set up tooling: Vitest + Testing Library + jsdom; `npm test` / `npm run test:watch` / `npm run typecheck` scripts; `cargo clippy -D warnings` and `cargo fmt` pass on the skeleton.
-- [ ] 1.5 Confirm `npm run tauri dev` launches an empty window on macOS.
+- [x] 1.5 Confirm `npm run tauri dev` launches an empty window on macOS.
 
 ## 2. Domain (Rust, pure)
 
@@ -40,7 +40,7 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 ## 5. Verification & Docs
 
 - [x] 5.1 Browser check with `VITE_API_MOCK=true` on the Vite dev server (Chrome tools): tree, rendering, XSS sample, and error states.
-- [ ] 5.2 Real app check on macOS (`tauri dev`, computer-use): AC1–AC4 and AC6 with a scratch folder (including `.git`, `node_modules`, a dot-file, a 1,000-file dir, and an XSS sample `.md`).
+- [x] 5.2 Real app check on macOS (`tauri dev`, computer-use): AC1–AC4 and AC6 with a scratch folder (including `.git`, `node_modules`, a dot-file, a 1,000-file dir, and an XSS sample `.md`). → Verified by the owner in `tauri dev` (computer-use was unavailable). The production-build check (`tauri build -- --debug`) was skipped by the owner; see 5.3a for CSP coverage.
 - [x] 5.3 Windows: try `cargo check --target x86_64-pc-windows-msvc` locally. If that is not possible, record it as deferred to #2 CI. → Deferred to #2 CI (cross-checking needs the MSVC target and SDK; not set up locally).
 - [x] 5.3a Production CSP + `freezePrototype` emulation: mock build served with the exact CSP header and `Object.freeze(Object.prototype)` before app scripts, driven by headless Chrome. Rendering, Shiki, and sanitization work; no script executes.
 - [x] 5.4 Update `CLAUDE.md`: Tech Stacks (finalized), Testing commands, and the dev command in Manual Verification.
