@@ -1,3 +1,5 @@
+import type { MockSeed } from "./mockApi";
+
 /** Sample content for browser development with the mock API. */
 const many = Object.fromEntries(
   Array.from({ length: 1000 }, (_, i) => {
@@ -72,4 +74,19 @@ None of these may execute or keep dangerous attributes.
 <form><input type="text" value="form"><button>submit</button></form>
 `,
   ...many,
+};
+
+/** Projects and addable folders for `npm run dev:mock`. */
+export const sampleSeed: MockSeed = {
+  projects: [
+    { name: "Kidock sample", path: "/mock/sample", files: sampleFiles },
+    {
+      name: "agent-notes",
+      path: "/mock/agent-notes",
+      files: { "plan.md": "# Plan\n\n- [ ] Ship #5\n", "logs/run-1.md": "# Run 1\n\nAll green." },
+    },
+    { name: "Moved away", path: "/mock/missing", files: {}, available: false },
+  ],
+  // `pickFolder()` returns "/mock/new-project" by default.
+  folders: { "/mock/new-project": { "README.md": "# New project\n\nAdded from the dialog." } },
 };

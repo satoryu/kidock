@@ -4,19 +4,17 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::entry::build_listing;
 use crate::domain::filter::is_markdown;
-use crate::domain::{
-    DomainError, ExclusionRules, RawEntry, RelPath, RootFolder, RootId, TreeEntry,
-};
+use crate::domain::{DomainError, ExclusionRules, RawEntry, RelPath, RootFolder, TreeEntry};
 
 /// Canonicalizes `path` and checks that it is a directory.
-pub fn open_root(id: RootId, path: &Path) -> Result<RootFolder, DomainError> {
+pub fn open_root(path: &Path) -> Result<RootFolder, DomainError> {
     // `dunce` avoids Windows `\\?\` verbatim paths where possible, so the
     // canonical form is also what we show and hand to the asset scope.
     let canonical = dunce::canonicalize(path).map_err(map_io)?;
     if !fs::metadata(&canonical).map_err(map_io)?.is_dir() {
         return Err(DomainError::NotADirectory);
     }
-    Ok(RootFolder::new(id, canonical))
+    Ok(RootFolder::new(canonical))
 }
 
 /// Resolves `rel` to a canonical path that is guaranteed to be inside `root`
@@ -91,7 +89,7 @@ mod tests {
 
     fn setup() -> (TempDir, RootFolder) {
         let dir = TempDir::new().unwrap();
-        let root = open_root(RootId(1), dir.path()).unwrap();
+        let root = open_root(dir.path()).unwrap();
         (dir, root)
     }
 
@@ -102,8 +100,7 @@ mod tests {
     #[test]
     fn open_root_canonicalizes_a_directory() {
         let dir = TempDir::new().unwrap();
-        let root = open_root(RootId(7), dir.path()).unwrap();
-        assert_eq!(root.id, RootId(7));
+        let root = open_root(dir.path()).unwrap();
         assert_eq!(
             root.canonical_path,
             dunce::canonicalize(dir.path()).unwrap()
@@ -115,9 +112,9 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let file = dir.path().join("a.md");
         fs::write(&file, "x").unwrap();
-        assert_eq!(open_root(RootId(1), &file), Err(DomainError::NotADirectory));
+        assert_eq!(open_root(&file), Err(DomainError::NotADirectory));
         assert_eq!(
-            open_root(RootId(1), &dir.path().join("missing")),
+            open_root(&dir.path().join("missing")),
             Err(DomainError::NotFound)
         );
     }

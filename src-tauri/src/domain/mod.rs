@@ -3,6 +3,7 @@
 pub mod entry;
 pub mod error;
 pub mod filter;
+pub mod project;
 pub mod rel_path;
 pub mod root;
 pub mod sort;
@@ -10,5 +11,6 @@ pub mod sort;
 pub use entry::{EntryKind, RawEntry, TreeEntry};
 pub use error::DomainError;
 pub use filter::ExclusionRules;
+pub use project::{Project, ProjectId, check_overlap, project_name};
 pub use rel_path::RelPath;
-pub use root::{RootFolder, RootId};
+pub use root::RootFolder;

@@ -11,27 +11,29 @@ const files = {
   "docs/deep/b.md": "# b",
 };
 
-async function setup(f: Record<string, string> = files) {
-  const mock = createMockApi(f);
-  await mock.setRoot("/mock/reports");
-  const spy = spyApi(mock);
+const mockWith = (f: Record<string, string>) =>
+  createMockApi({ projects: [{ name: "reports", path: "/mock/reports", files: f }] });
+
+function setup(f: Record<string, string> = files) {
+  const spy = spyApi(mockWith(f));
   const onSelect = vi.fn();
-  renderWithApi(<Tree selected={null} onSelect={onSelect} />, spy.api);
+  renderWithApi(<Tree projectId={1} selected={null} onSelect={onSelect} />, spy.api);
   return { ...spy, onSelect };
 }
 
 describe("Tree", () => {
   it("lists the root level", async () => {
-    await setup();
+    setup();
     expect(await screen.findByRole("treeitem", { name: "docs" })).toBeInTheDocument();
     expect(screen.getByRole("treeitem", { name: "README.md" })).toBeInTheDocument();
     expect(screen.queryByRole("treeitem", { name: "a.md" })).not.toBeInTheDocument();
   });
 
   it("loads children lazily, once per expansion", async () => {
-    const { calls } = await setup();
+    const { calls } = setup();
     const docs = await screen.findByRole("treeitem", { name: "docs" });
-    const listCalls = () => calls.filter((c) => c.method === "listDir").map((c) => c.args[0]);
+    const listCalls = () => calls.filter((c) => c.method === "listDir").map((c) => c.args[1]);
+    expect(calls.filter((c) => c.method === "listDir").every((c) => c.args[0] === 1)).toBe(true);
     expect(listCalls()).toEqual([""]);
 
     await userEvent.click(docs);
@@ -45,15 +47,13 @@ describe("Tree", () => {
   });
 
   it("selects markdown files", async () => {
-    const { onSelect } = await setup();
+    const { onSelect } = setup();
     await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
     expect(onSelect).toHaveBeenCalledWith("README.md");
   });
 
   it("marks the selected file", async () => {
-    const mock = createMockApi(files);
-    await mock.setRoot("/mock/reports");
-    renderWithApi(<Tree selected="README.md" onSelect={() => {}} />, mock);
+    renderWithApi(<Tree projectId={1} selected="README.md" onSelect={() => {}} />, mockWith(files));
     expect(await screen.findByRole("treeitem", { name: "README.md" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -61,15 +61,16 @@ describe("Tree", () => {
   });
 
   it("shows an empty state when the folder has no markdown", async () => {
-    await setup({});
+    setup({});
     expect(await screen.findByText(/no markdown files/i)).toBeInTheDocument();
   });
 
   it("shows an error when a directory cannot be listed", async () => {
-    const mock = createMockApi(files);
-    await mock.setRoot("/mock/reports");
-    const api = { ...mock, listDir: () => Promise.reject(Object.assign(new Error("denied"), { kind: "PermissionDenied" })) };
-    renderWithApi(<Tree selected={null} onSelect={() => {}} />, api);
+    const api = {
+      ...mockWith(files),
+      listDir: () => Promise.reject(Object.assign(new Error("denied"), { kind: "PermissionDenied" })),
+    };
+    renderWithApi(<Tree projectId={1} selected={null} onSelect={() => {}} />, api);
     expect(await screen.findByRole("alert")).toHaveTextContent(/permission/i);
   });
 });

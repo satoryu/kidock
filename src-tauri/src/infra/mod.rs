@@ -2,3 +2,4 @@
 
 pub mod asset_scope;
 pub mod fs_reader;
+pub mod store;

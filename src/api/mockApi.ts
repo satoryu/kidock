@@ -1,4 +1,20 @@
-import { KidockError, type KidockApi, type RootInfo, type TreeEntry } from "./types";
+import { KidockError, type KidockApi, type ProjectInfo, type TreeEntry } from "./types";
+
+type Files = Record<string, string>;
+
+export type MockProject = {
+  name: string;
+  path: string;
+  /** `{ "relative/path.md": content }` */
+  files: Files;
+  available?: boolean;
+};
+
+export type MockSeed = {
+  projects?: MockProject[];
+  /** Folders that can be added later via `addProject(name, path)`. */
+  folders?: Record<string, Files>;
+};
 
 type MockOptions = {
   /** Path returned by `pickFolder` (`null` simulates cancel). */
@@ -7,23 +23,47 @@ type MockOptions = {
   delayMs?: number;
 };
 
+const MAX_NAME_CHARS = 100;
+
 /**
- * In-memory `KidockApi` backed by a `{ "relative/path.md": content }` map.
- * Mirrors the backend's ordering and error kinds closely enough for UI work.
+ * In-memory `KidockApi`. Mirrors the backend's ordering, name and overlap
+ * rules, and error kinds closely enough for UI work and tests.
  */
 export function createMockApi(
-  files: Record<string, string>,
-  { pickResult = "/mock/reports", delayMs = 0 }: MockOptions = {},
+  seed: MockSeed,
+  { pickResult = "/mock/new-project", delayMs = 0 }: MockOptions = {},
 ): KidockApi {
-  let root: RootInfo | null = null;
+  type Entry = { info: ProjectInfo; files: Files };
+  const projects = new Map<number, Entry>();
+  const folders = new Map(Object.entries(seed.folders ?? {}));
+  let nextId = 1;
+
+  for (const p of seed.projects ?? []) {
+    if (!folders.has(p.path)) folders.set(p.path, p.files);
+    const id = nextId++;
+    projects.set(id, {
+      info: { id, name: p.name, path: p.path, available: p.available ?? true },
+      files: p.files,
+    });
+  }
 
   const wait = () => new Promise((r) => setTimeout(r, delayMs));
+  const segments = (path: string) => path.toLowerCase().split(/[\\/]/).filter(Boolean);
+  const startsWith = (a: string[], b: string[]) => b.every((s, i) => a[i] === s);
 
-  function checkRel(rel: string) {
-    if (!root) throw new KidockError("NoRootSelected", "no folder is selected");
+  function project(id: number): Entry {
+    const p = projects.get(id);
+    if (!p) throw new KidockError("ProjectNotFound", "project not found");
+    return p;
+  }
+
+  function checkRel(id: number, rel: string): Files {
+    const p = project(id);
     if (rel.startsWith("/") || rel.split("/").includes("..")) {
-      throw new KidockError("OutsideRoot", "path is outside the selected folder");
+      throw new KidockError("OutsideRoot", "path is outside the project folder");
     }
+    if (!p.info.available) throw new KidockError("NotFound", "file or directory not found");
+    return p.files;
   }
 
   return {
@@ -32,16 +72,52 @@ export function createMockApi(
       return pickResult;
     },
 
-    async setRoot(path) {
+    async listProjects() {
       await wait();
-      const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-      root = { id: (root?.id ?? 0) + 1, name, path };
-      return root;
+      return [...projects.values()]
+        .map((p) => p.info)
+        .sort(
+          (a, b) =>
+            a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.id - b.id,
+        );
     },
 
-    async listDir(rel) {
+    async addProject(name, path) {
       await wait();
-      checkRel(rel);
+      const files = folders.get(path);
+      if (!files) throw new KidockError("NotFound", "file or directory not found");
+      const cand = segments(path);
+      for (const { info } of projects.values()) {
+        const other = segments(info.path);
+        if (other.join("/") === cand.join("/")) {
+          throw new KidockError("AlreadyRegistered", "this folder is already a project");
+        }
+        if (startsWith(cand, other) || startsWith(other, cand)) {
+          throw new KidockError("OverlapsProject", "this folder is inside, or contains, another project");
+        }
+      }
+      const fallback = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+      const trimmed = (name ?? "").trim();
+      const id = nextId++;
+      const info: ProjectInfo = {
+        id,
+        name: [...(trimmed || fallback)].slice(0, MAX_NAME_CHARS).join(""),
+        path,
+        available: true,
+      };
+      projects.set(id, { info, files });
+      return info;
+    },
+
+    async removeProject(projectId) {
+      await wait();
+      project(projectId);
+      projects.delete(projectId);
+    },
+
+    async listDir(projectId, rel) {
+      await wait();
+      const files = checkRel(projectId, rel);
       const prefix = rel === "" ? "" : `${rel}/`;
       const children = new Map<string, TreeEntry>();
       for (const path of Object.keys(files)) {
@@ -61,10 +137,9 @@ export function createMockApi(
       );
     },
 
-    async readMarkdown(rel) {
+    async readMarkdown(projectId, rel) {
       await wait();
-      checkRel(rel);
-      const content = files[rel];
+      const content = checkRel(projectId, rel)[rel];
       if (content === undefined) throw new KidockError("NotFound", "file or directory not found");
       return content;
     },

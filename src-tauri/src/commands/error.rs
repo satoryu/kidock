@@ -13,7 +13,9 @@ pub struct CommandError {
 impl From<DomainError> for CommandError {
     fn from(err: DomainError) -> Self {
         let kind = match &err {
-            DomainError::NoRootSelected => "NoRootSelected",
+            DomainError::ProjectNotFound => "ProjectNotFound",
+            DomainError::AlreadyRegistered => "AlreadyRegistered",
+            DomainError::OverlapsProject => "OverlapsProject",
             DomainError::InvalidPath(_) => "InvalidPath",
             DomainError::OutsideRoot => "OutsideRoot",
             DomainError::NotFound => "NotFound",
@@ -22,6 +24,7 @@ impl From<DomainError> for CommandError {
             DomainError::NotMarkdown => "NotMarkdown",
             DomainError::NotUtf8 => "NotUtf8",
             DomainError::Io(_) => "Io",
+            DomainError::Storage(_) => "Storage",
         };
         Self {
             kind,
@@ -39,13 +42,15 @@ mod tests {
         let e = CommandError::from(DomainError::OutsideRoot);
         let json = serde_json::to_value(&e).unwrap();
         assert_eq!(json["kind"], "OutsideRoot");
-        assert_eq!(json["message"], "path is outside the selected folder");
+        assert_eq!(json["message"], "path is outside the project folder");
     }
 
     #[test]
     fn maps_every_variant_to_a_stable_kind() {
         let cases = [
-            (DomainError::NoRootSelected, "NoRootSelected"),
+            (DomainError::ProjectNotFound, "ProjectNotFound"),
+            (DomainError::AlreadyRegistered, "AlreadyRegistered"),
+            (DomainError::OverlapsProject, "OverlapsProject"),
             (DomainError::InvalidPath("x".into()), "InvalidPath"),
             (DomainError::OutsideRoot, "OutsideRoot"),
             (DomainError::NotFound, "NotFound"),
@@ -54,6 +59,7 @@ mod tests {
             (DomainError::NotMarkdown, "NotMarkdown"),
             (DomainError::NotUtf8, "NotUtf8"),
             (DomainError::Io("boom".into()), "Io"),
+            (DomainError::Storage("locked".into()), "Storage"),
         ];
         for (err, kind) in cases {
             assert_eq!(CommandError::from(err).kind, kind);

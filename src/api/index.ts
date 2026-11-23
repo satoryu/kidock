@@ -8,11 +8,11 @@ import type { KidockApi } from "./types";
  */
 export async function loadApi(): Promise<KidockApi> {
   if (import.meta.env.VITE_API_MOCK === "true") {
-    const [{ createMockApi }, { sampleFiles }] = await Promise.all([
+    const [{ createMockApi }, { sampleSeed }] = await Promise.all([
       import("./mockApi"),
       import("./sampleFiles"),
     ]);
-    return createMockApi(sampleFiles, { delayMs: 150 });
+    return createMockApi(sampleSeed, { delayMs: 150 });
   }
   return tauriApi;
 }

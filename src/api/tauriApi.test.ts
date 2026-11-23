@@ -3,6 +3,8 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import { tauriApi, toKidockError } from "./tauriApi";
 import { KidockError } from "./types";
 
+const project = { id: 1, name: "reports", path: "/r", available: true };
+
 describe("tauriApi", () => {
   it("pickFolder opens a directory dialog and returns the path", async () => {
     const calls: Array<{ cmd: string; payload: unknown }> = [];
@@ -29,8 +31,12 @@ describe("tauriApi", () => {
     mockIPC((cmd, payload) => {
       calls.push({ cmd, payload });
       switch (cmd) {
-        case "set_root":
-          return { id: 1, name: "reports", path: "/r" };
+        case "list_projects":
+          return [project];
+        case "add_project":
+          return project;
+        case "remove_project":
+          return null;
         case "list_dir":
           return [{ name: "a.md", relPath: "a.md", kind: "markdown" }];
         case "read_markdown":
@@ -38,33 +44,32 @@ describe("tauriApi", () => {
       }
     });
 
-    await expect(tauriApi.setRoot("/r")).resolves.toEqual({
-      id: 1,
-      name: "reports",
-      path: "/r",
-    });
-    await expect(tauriApi.listDir("docs")).resolves.toEqual([
+    await expect(tauriApi.listProjects()).resolves.toEqual([project]);
+    await expect(tauriApi.addProject(null, "/r")).resolves.toEqual(project);
+    await expect(tauriApi.addProject("Reports", "/r")).resolves.toEqual(project);
+    await expect(tauriApi.removeProject(1)).resolves.toBeUndefined();
+    await expect(tauriApi.listDir(1, "docs")).resolves.toEqual([
       { name: "a.md", relPath: "a.md", kind: "markdown" },
     ]);
-    await expect(tauriApi.readMarkdown("docs/a.md")).resolves.toBe("# A");
+    await expect(tauriApi.readMarkdown(1, "docs/a.md")).resolves.toBe("# A");
     expect(calls).toEqual([
-      { cmd: "set_root", payload: { path: "/r" } },
-      { cmd: "list_dir", payload: { rel: "docs" } },
-      { cmd: "read_markdown", payload: { rel: "docs/a.md" } },
+      { cmd: "list_projects", payload: {} },
+      { cmd: "add_project", payload: { name: null, path: "/r" } },
+      { cmd: "add_project", payload: { name: "Reports", path: "/r" } },
+      { cmd: "remove_project", payload: { projectId: 1 } },
+      { cmd: "list_dir", payload: { projectId: 1, rel: "docs" } },
+      { cmd: "read_markdown", payload: { projectId: 1, rel: "docs/a.md" } },
     ]);
   });
 
   it("converts backend CommandError payloads into KidockError", async () => {
     mockIPC(() => {
-      throw { kind: "OutsideRoot", message: "path is outside the selected folder" };
+      throw { kind: "OverlapsProject", message: "this folder is inside, or contains, another project" };
     });
 
-    const err = await tauriApi.readMarkdown("../x.md").catch((e: unknown) => e);
+    const err = await tauriApi.addProject(null, "/r/sub").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(KidockError);
-    expect(err).toMatchObject({
-      kind: "OutsideRoot",
-      message: "path is outside the selected folder",
-    });
+    expect(err).toMatchObject({ kind: "OverlapsProject" });
   });
 });
 

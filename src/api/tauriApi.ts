@@ -1,9 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { KidockError, type ErrorKind, type KidockApi, type RootInfo, type TreeEntry } from "./types";
+import {
+  KidockError,
+  type ErrorKind,
+  type KidockApi,
+  type ProjectInfo,
+  type TreeEntry,
+} from "./types";
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set<ErrorKind>([
-  "NoRootSelected",
+  "ProjectNotFound",
+  "AlreadyRegistered",
+  "OverlapsProject",
   "InvalidPath",
   "OutsideRoot",
   "NotFound",
@@ -12,6 +20,7 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set<ErrorKind>([
   "NotMarkdown",
   "NotUtf8",
   "Io",
+  "Storage",
 ]);
 
 /** Normalizes whatever `invoke` rejected with into a `KidockError`. */
@@ -26,7 +35,7 @@ export function toKidockError(e: unknown): KidockError {
   return new KidockError("Unknown", String(e));
 }
 
-async function call<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
+async function call<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   try {
     return await invoke<T>(cmd, args);
   } catch (e) {
@@ -39,7 +48,11 @@ export const tauriApi: KidockApi = {
     const selected = await open({ directory: true, multiple: false });
     return typeof selected === "string" ? selected : null;
   },
-  setRoot: (path) => call<RootInfo>("set_root", { path }),
-  listDir: (relPath) => call<TreeEntry[]>("list_dir", { rel: relPath }),
-  readMarkdown: (relPath) => call<string>("read_markdown", { rel: relPath }),
+  listProjects: () => call<ProjectInfo[]>("list_projects"),
+  addProject: (name, path) => call<ProjectInfo>("add_project", { name, path }),
+  removeProject: async (projectId) => {
+    await call<null>("remove_project", { projectId });
+  },
+  listDir: (projectId, relPath) => call<TreeEntry[]>("list_dir", { projectId, rel: relPath }),
+  readMarkdown: (projectId, relPath) => call<string>("read_markdown", { projectId, rel: relPath }),
 };
