@@ -4,12 +4,12 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 ## 1. Test setup
 
-- [ ] 1.1 Extend the Vitest `include` to `scripts/**/*.test.mjs` (node environment via a per-file `@vitest-environment node` comment).
+- [x] 1.1 Split Vitest into two projects: `web` (jsdom + `src/test/setup.ts`, `src/**`) and `scripts` (node, `scripts/**/*.test.mjs`, `.claude/**/*.test.mjs`). A per-file environment comment was not enough: the jsdom setup file still ran.
 
 ## 2. Git add guard
 
-- [ ] 2.1 `findBulkGitAdd` tests first: blocked forms (`-A`, `--all`, `.`, `./`, `:/`, `*`, `-u`, `--update`, `-Av`, `-- .`), chains (`&&`, `;`, `|`, newline), `$( )`, `git -C dir add .`, `VAR=1 git add .`. Allowed: explicit paths, `-p file`, `-N file`, `git status`, `echo "git add ."`, `git commit -m "git add ."`.
-- [ ] 2.2 Implement `scripts/lib/gitAddGuard.mjs` (tokenizer + matcher).
+- [x] 2.1 `findBulkGitAdd` tests first: blocked forms (`-A`, `--all`, `.`, `./`, `:/`, `*`, `-u`, `--update`, `-Av`, `-- .`), chains (`&&`, `;`, `|`, newline), `$( )`, `git -C dir add .`, `VAR=1 git add .`. Allowed: explicit paths, `-p file`, `-N file`, `git status`, `echo "git add ."`, `git commit -m "git add ."`.
+- [x] 2.2 Implement `scripts/lib/gitAddGuard.mjs` (tokenizer + matcher).
 - [ ] 2.3 `.claude/hooks/guard-git-add.mjs` entry point (stdin JSON → exit 2 + stderr, or exit 0). Test it by spawning it with sample stdin.
 - [ ] 2.4 `.claude/settings.json`: re-check the hook keys (`args`, `timeout`, `onFailure`) against the current hooks docs and the installed Claude Code version. Then add the hook.
 - [ ] 2.5 Real check: in this session, `git add .` is blocked and `git add <path>` works (AC4).

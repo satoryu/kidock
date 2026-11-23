@@ -23,8 +23,25 @@ export default defineConfig(() => ({
   },
 
   test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
+    projects: [
+      {
+        // React app: DOM environment + Testing Library / Tauri mock cleanup.
+        extends: true,
+        test: {
+          name: "web",
+          environment: "jsdom",
+          setupFiles: ["./src/test/setup.ts"],
+          include: ["src/**/*.test.{ts,tsx}"],
+        },
+      },
+      {
+        // Repository tooling (hooks, CI helpers): plain Node.
+        test: {
+          name: "scripts",
+          environment: "node",
+          include: ["scripts/**/*.test.mjs", ".claude/**/*.test.mjs"],
+        },
+      },
+    ],
   },
 }));
