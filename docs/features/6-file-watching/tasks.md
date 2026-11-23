@@ -27,5 +27,9 @@ Complete in order, with TDD for logic.
 
 ## 5. Verification and docs
 
-- [ ] 5.1 All checks pass. Manual scenario steps 1–6 on macOS via `tauri dev` (backend log / event).
+- [x] 5.1 All checks pass. Manual scenario steps 1–6 on macOS via `tauri dev` (backend log / event). → Real app (`tauri dev`, macOS), with a scratch project registered in the DB:
+  - on startup: migration v2 and a silent baseline
+  - steps 1–6 tracked in the `files` table: create, in-place overwrite, atomic `mv`, rename, identical rewrite (hash kept), excluded/temp ignored
+  - an offline edit of the same size was detected by the startup rescan
+  - UI event delivery is covered by component tests; exactly-once is covered by `tests/watch.rs`
 - [ ] 5.2 `CLAUDE.md` updates. PR, self-review, merge through the CI gate.
