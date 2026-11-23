@@ -10,8 +10,8 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 - [x] 2.1 `findBulkGitAdd` tests first: blocked forms (`-A`, `--all`, `.`, `./`, `:/`, `*`, `-u`, `--update`, `-Av`, `-- .`), chains (`&&`, `;`, `|`, newline), `$( )`, `git -C dir add .`, `VAR=1 git add .`. Allowed: explicit paths, `-p file`, `-N file`, `git status`, `echo "git add ."`, `git commit -m "git add ."`.
 - [x] 2.2 Implement `scripts/lib/gitAddGuard.mjs` (tokenizer + matcher).
-- [ ] 2.3 `.claude/hooks/guard-git-add.mjs` entry point (stdin JSON → exit 2 + stderr, or exit 0). Test it by spawning it with sample stdin.
-- [ ] 2.4 `.claude/settings.json`: re-check the hook keys (`args`, `timeout`, `onFailure`) against the current hooks docs and the installed Claude Code version. Then add the hook.
+- [x] 2.3 `.claude/hooks/guard-git-add.mjs` entry point (stdin JSON → exit 2 + stderr, or exit 0). Test it by spawning it with sample stdin.
+- [x] 2.4 `.claude/settings.json`: re-check the hook keys (`args`, `timeout`, `onFailure`) against the current hooks docs and the installed Claude Code version. Then add the hook. → Exec form (`command` + `args`) and `onFailure: "block"` per the hooks docs; installed Claude Code is 2.1.330 (≥ 2.1.295 needed for `onFailure`).
 - [ ] 2.5 Real check: in this session, `git add .` is blocked and `git add <path>` works (AC4).
 
 ## 3. Watch-and-merge
