@@ -73,8 +73,12 @@ jobs:
 Usage (documented in `CLAUDE.md`):
 
 ```bash
-node scripts/watch-pr.mjs <PR> && gh pr merge <PR> --squash --delete-branch
+HEAD_SHA=$(git rev-parse HEAD)
+node scripts/watch-pr.mjs <PR> --head "$HEAD_SHA" &&
+  gh pr merge <PR> --squash --delete-branch --match-head-commit "$HEAD_SHA"
 ```
+
+`--head` and `--match-head-commit` (added after self-review) pin both steps to the verified commit: right after a push, the PR can still report the previous commit's green checks.
 
 `scripts/watch-pr.mjs <PR>`:
 

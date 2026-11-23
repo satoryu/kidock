@@ -24,11 +24,11 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 - [x] 4.1 Add `.nvmrc` (`22`) and `.gitattributes` (`* text=auto eol=lf`). Renormalize if needed. → No CRLF files in the index (`git ls-files --eol`), so no renormalization was needed.
 - [x] 4.2 `.github/workflows/ci.yml` as designed. Re-check the inputs of each action's current major version (`actions/checkout@v7`, `actions/setup-node@v7`, `dtolnay/rust-toolchain`, `Swatinem/rust-cache@v2`) in their READMEs. → Inputs checked in the READMEs (`node-version-file`, `cache`, `components`, `workspaces: src-tauri -> target`, `persist-credentials`). Debug Rust builds do not need `dist/` (checked locally), so the cargo steps run before any frontend build.
-- [ ] 4.3 Open the PR and get CI green on both OSes (AC1). Fix Windows-only failures as they appear.
-- [ ] 4.4 AC2 real run: push a deliberately failing test, confirm `watch-pr.mjs` exits non-zero, then revert and confirm it exits 0.
+- [x] 4.3 Open the PR and get CI green on both OSes (AC1). Fix Windows-only failures as they appear. → Green on the first run (45195600528: macOS 4m24s, Windows 6m11s); no Windows-only fixes needed.
+- [x] 4.4 AC2 real run: push a deliberately failing test, confirm `watch-pr.mjs` exits non-zero, then revert and confirm it exits 0. → Exit 1 on the failing commit 5cca9e7 (run 45196874962, fail-fast after macOS failed). Exit 0 is shown by the final merge gate after the revert. Also observed: a push mid-watch reset the checks and the script exited 1 (no checks), not 0.
 
 ## 5. Docs
 
 - [x] 5.1 `CLAUDE.md`: replace the Definition of Done TODO with the watch-and-merge and watch-`main` commands. Replace the hook TODO with a reference to `.claude/settings.json` and its limits. Add `scripts/` to Testing if needed.
 - [x] 5.2 README: CI badge.
-- [ ] 5.3 PR Test Plan (OS per item), self-review, fix findings. Merge with `watch-pr.mjs && gh pr merge`, then watch `main`.
+- [x] 5.3 PR Test Plan (OS per item), self-review, fix findings. Merge with `watch-pr.mjs && gh pr merge`, then watch `main`. → Self-review found that a just-pushed commit could be merged on the previous commit's green checks; fixed with `--head` + `--match-head-commit` (174a1cf).
