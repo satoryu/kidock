@@ -40,14 +40,16 @@ These apply to every Issue. Revisit them when designing anything that touches fi
 
 ## Tech Stacks
 
-> **Not finalized.** The stack below is the working assumption. It will be decided in the `design.md` of Issue #1; update this section when it is.
+Decided in [`docs/1-scaffold-folder-tree-render/design.md`](docs/1-scaffold-folder-tree-render/design.md) (rationale there).
 
-- **Tauri v2** + Rust backend
-- Frontend: Vite + TypeScript (React or Svelte — TBD)
-- File watching: `notify` + `notify-debouncer-full` (Rust side)
-- Markdown: markdown-it (or equivalent) + mermaid + shiki
-- State persistence: `tauri-plugin-store` or SQLite — TBD
-- Notifications: `tauri-plugin-notification`
+- **Tauri 2.12.x** + Rust (edition 2024, MSRV 1.90). Tauri 3 is alpha; do not use it.
+- Frontend: **React 19 + TypeScript 7 + Vite 8**, npm. Node `^20.19.0 || >=22.12.0`.
+- Markdown: **markdown-it** (GFM; task lists via our own `src/markdown/taskLists.ts`) → **Shiki 4** (core build, JavaScript regex engine, curated languages) → **DOMPurify** (`src/markdown/sanitize.ts`).
+- Mermaid: `mermaid` (introduced in #5).
+- File access: Kidock's own Rust commands (no `tauri-plugin-fs`). Folder picker: `tauri-plugin-dialog`.
+- File watching: `notify` + `notify-debouncer-full` (introduced in #3).
+- State persistence: SQLite via `rusqlite` (bundled), owned by the Rust backend (introduced in #3).
+- Notifications: `tauri-plugin-notification` (introduced in #4).
 
 ## Workflow
 
@@ -94,14 +96,15 @@ You must complete each task in order and check them off as you complete them.
 You must follow TDD (Test-Driven Development) principles when implementing the tasks.
 This means you must write todos to complete the task first, then write a test that fails, and finally implement the code to make the test pass. Then refactor the code if necessary.
 
-### Layering (policy; finalize in Issue #1)
+### Layering
 
-- **Rust backend**: `domain` / `infra` / `commands`.
+- **Rust backend** (`src-tauri/src/`): `domain` / `infra` / `commands` (+ `state.rs`).
   - `domain`: pure logic (change detection, unread state, exclusion rules, path normalization). No Tauri, no filesystem I/O.
   - `infra`: adapters for the filesystem, `notify`, persistence, and OS notifications.
-  - `commands`: thin Tauri command / event handlers that wire `infra` to `domain`.
+  - `commands`: thin Tauri command / event handlers that wire `infra` to `domain`. Each `#[tauri::command]` delegates to a plain `do_*` function taking `&AppState`, so it is testable without a Tauri runtime.
   - Keep dependencies pointing inward: `commands` and `infra` may depend on `domain`, but `domain` must not depend on the outer layers.
-- **Frontend**: isolate all Tauri IPC calls behind a single API module so components can be tested (and run in a browser) with a mock implementation.
+- **Frontend** (`src/`): all backend access goes through the `KidockApi` interface (`src/api/`), provided via React context (`ApiProvider` / `useApi`). `tauriApi` is the real implementation; `mockApi` is used in tests and in browser dev. Components never import `@tauri-apps/api` directly.
+- **Path rule**: the frontend sends an absolute path only once (to `set_root`, from the folder dialog). Every other request uses a `/`-separated path relative to the root, validated by `RelPath` and checked again after canonicalization.
 
 ## Testing
 
@@ -109,14 +112,18 @@ This means you must write todos to complete the task first, then write a test th
 - **Frontend**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/), plus the TypeScript type-check.
 
 ```bash
-# TODO: replace with the actual commands after scaffolding (Issue #1).
-# e.g.
-# cargo test --manifest-path src-tauri/Cargo.toml
-# cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-# cargo fmt --manifest-path src-tauri/Cargo.toml --check
-# npm test
-# npx tsc --noEmit
+# Rust (run from the repo root)
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+# Frontend
+npm test            # run the whole suite once
+npm run test:watch  # watch mode
+npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
 ```
+
+IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`.
 
 ## Branching Strategy
 
@@ -144,8 +151,8 @@ When issues are found during code review, do not dismiss them solely because the
 
 When the Test Plan includes manual verification items, you must perform the verification yourself as far as the environment allows. Only hand an item to the user when it genuinely cannot be done here, and then give them exact steps and the expected result.
 
-1. **Frontend in a browser (fast loop)**: run the frontend alone on the Vite dev server with the IPC API module swapped for a mock (fake folders, fake file events). Verify layout, tree behavior, unread badges, and rendering (GFM, code highlighting, Mermaid, relative images/links) with the Chrome integration tools. This does not exercise Rust, the real filesystem, or OS integration.
-2. **Real app**: run the app via the Tauri dev command (TODO: fill in after scaffolding) and verify end to end. On macOS, use computer-use to drive the native window when needed.
+1. **Frontend in a browser (fast loop)**: `npm run dev:mock` serves the UI at `http://localhost:1420` with the in-memory mock API (`.env.mock` sets `VITE_API_MOCK=true`; sample content lives in `src/api/sampleFiles.ts`, including an XSS sample and a 1,000-file directory). Verify layout, tree behavior, unread badges, and rendering (GFM, code highlighting, Mermaid, relative images/links) with the Chrome integration tools. This does not exercise Rust, the real filesystem, or OS integration.
+2. **Real app**: `npm run tauri dev` and verify end to end. On macOS, use computer-use to drive the native window when needed.
 3. **File-watching scenario** — use a disposable verification folder (e.g. under the scratchpad), register it in the app, then:
    1. Create a new `.md` → unread mark + folder badge increments + one OS notification.
    2. Overwrite an existing `.md` in place → marked unread again; if it is open, it re-renders and keeps scroll position.

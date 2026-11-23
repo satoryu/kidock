@@ -60,13 +60,14 @@ domain/
   entry.rs        // TreeEntry { name, rel_path, kind: Dir|Markdown }
   filter.rs       // ExclusionRules (default: .git, node_modules, dot-entries) + is_markdown
   sort.rs         // dirs first, then case-insensitive name
-  error.rs        // DomainError (OutsideRoot, NotFound, PermissionDenied, NotUtf8, NotMarkdown, NoRootSelected)
+  error.rs        // DomainError (NoRootSelected, InvalidPath, OutsideRoot, NotFound, PermissionDenied, NotADirectory, NotMarkdown, NotUtf8, Io)
 infra/
   mod.rs
   fs_reader.rs    // list_dir(root, rel) -> Vec<RawEntry>, read_text(root, rel) -> String
   asset_scope.rs  // allow_root(app, root)
 commands/
-  mod.rs          // select_root, list_dir, read_markdown
+  mod.rs          // set_root, list_dir, read_markdown (+ testable do_* functions, DTOs)
+  error.rs        // CommandError { kind, message } — the IPC wire form of DomainError
 state.rs          // AppState { root: Mutex<Option<RootFolder>> }
 ```
 
