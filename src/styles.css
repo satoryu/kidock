@@ -721,3 +721,25 @@ button {
   border: 1px dashed var(--border);
   border-radius: 4px;
 }
+
+/* ---- Exclusions dialog ---- */
+.modal textarea.patterns {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.field-help {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+}
+
+.modal-actions .text-left-action {
+  margin-right: auto;
+}

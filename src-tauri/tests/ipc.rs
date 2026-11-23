@@ -118,6 +118,18 @@ fn project_lifecycle_over_ipc() {
         assert_eq!(err["kind"], json!("InvalidPath"), "{url}");
     }
 
+    // Exclusions.
+    let ex = invoke(&webview, "get_exclusions", json!({})).unwrap();
+    assert_eq!(ex["patterns"], ex["defaults"]);
+    assert_eq!(
+        invoke(
+            &webview,
+            "set_exclusions",
+            json!({ "patterns": ["scratch", " "] })
+        ),
+        Ok(json!(["scratch"]))
+    );
+
     // Notification toggle.
     assert_eq!(
         invoke(&webview, "get_notifications_enabled", json!({})),

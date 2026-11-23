@@ -15,9 +15,11 @@ use tauri::{AppHandle, Runtime, State};
 
 pub use error::CommandError;
 
+use crate::domain::filter::DEFAULT_PATTERNS;
 use crate::domain::percent::is_external_url;
 use crate::domain::{
-    DomainError, EntryKind, Project, ProjectId, RelPath, TreeEntry, check_overlap, project_name,
+    DomainError, EntryKind, ExclusionRules, Project, ProjectId, RelPath, TreeEntry, check_overlap,
+    project_name,
 };
 use crate::infra::fs_reader;
 use crate::infra::store::{InboxRow, UnreadCounts};
@@ -195,7 +197,7 @@ pub fn do_list_dir(
     rel: &str,
 ) -> Result<Vec<TreeEntryDto>, CommandError> {
     let (project, rel) = project_and_rel(state, id, rel)?;
-    let entries = fs_reader::list_dir(&project.folder, &rel, &state.rules)?;
+    let entries = fs_reader::list_dir(&project.folder, &rel, &state.rules())?;
     Ok(entries.into_iter().map(TreeEntryDto::from).collect())
 }
 
@@ -225,6 +227,30 @@ pub fn do_mark_read(state: &AppState, id: ProjectId, rel: &str) -> Result<bool, 
 
 pub fn do_mark_all_read(state: &AppState) -> Result<usize, CommandError> {
     Ok(state.store().mark_all_read()?)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ExclusionsDto {
+    pub patterns: Vec<String>,
+    pub defaults: Vec<String>,
+}
+
+pub fn do_get_exclusions(state: &AppState) -> ExclusionsDto {
+    ExclusionsDto {
+        patterns: state.rules().patterns().to_vec(),
+        defaults: DEFAULT_PATTERNS.iter().map(|p| p.to_string()).collect(),
+    }
+}
+
+/// Validates, persists, and applies new patterns; returns them normalized.
+pub fn do_set_exclusions(
+    state: &AppState,
+    patterns: &[String],
+) -> Result<Vec<String>, CommandError> {
+    let rules = ExclusionRules::from_patterns(patterns)?;
+    let normalized = rules.patterns().to_vec();
+    state.set_rules(rules)?;
+    Ok(normalized)
 }
 
 pub fn do_set_notifications_enabled(state: &AppState, enabled: bool) -> Result<(), CommandError> {
@@ -323,6 +349,19 @@ pub fn mark_read(
 #[tauri::command(async)]
 pub fn mark_all_read(state: State<'_, Arc<AppState>>) -> Result<usize, CommandError> {
     do_mark_all_read(&state)
+}
+
+#[tauri::command(async)]
+pub fn get_exclusions(state: State<'_, Arc<AppState>>) -> ExclusionsDto {
+    do_get_exclusions(&state)
+}
+
+#[tauri::command(async)]
+pub fn set_exclusions(
+    state: State<'_, Arc<AppState>>,
+    patterns: Vec<String>,
+) -> Result<Vec<String>, CommandError> {
+    do_set_exclusions(&state, &patterns)
 }
 
 #[tauri::command(async)]
@@ -592,6 +631,33 @@ mod tests {
         assert_eq!(do_mark_all_read(&state).unwrap(), 2);
         do_remove_project(&state, pa.id).unwrap();
         assert_eq!(do_list_inbox(&state).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn exclusions_hide_entries_from_the_tree_and_validate_input() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir(dir.path().join("scratch")).unwrap();
+        fs::write(dir.path().join("scratch/x.md"), "x").unwrap();
+        fs::write(dir.path().join("a.md"), "a").unwrap();
+        let state = state();
+        let p = do_add_project(&state, None, dir.path()).unwrap();
+        assert_eq!(do_list_dir(&state, p.id, "").unwrap().len(), 2);
+
+        let mut patterns = do_get_exclusions(&state).patterns;
+        assert_eq!(patterns, do_get_exclusions(&state).defaults);
+        patterns.push(" scratch ".into());
+        let saved = do_set_exclusions(&state, &patterns).unwrap();
+        assert_eq!(saved.last().map(String::as_str), Some("scratch"));
+        let names: Vec<_> = do_list_dir(&state, p.id, "")
+            .unwrap()
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert_eq!(names, ["a.md"]);
+
+        let err = do_set_exclusions(&state, &["a/b".into()]).unwrap_err();
+        assert_eq!(err.kind, "InvalidPath");
+        assert_eq!(do_get_exclusions(&state).patterns, saved); // unchanged on error
     }
 
     #[test]

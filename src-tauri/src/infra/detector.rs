@@ -88,7 +88,7 @@ impl Detector {
         // rewrite within the file system's mtime resolution must not be missed.
         // Full scans touch every file and rely on size/mtime to skip unchanged ones.
         let force_hash = matches!(msg, Msg::Paths { .. });
-        let rules = &self.state.rules;
+        let rules = &*self.state.rules();
         let mut ops = Vec::new();
         let mut changes = Vec::new();
         for wire in candidates {
@@ -159,7 +159,7 @@ impl Detector {
             // Or a directory that appeared (created or moved in).
             if scan::is_dir(&project.folder, &rel) {
                 out.extend(
-                    scan::walk(&project.folder, &rel, &self.state.rules)
+                    scan::walk(&project.folder, &rel, &self.state.rules())
                         .into_iter()
                         .map(|(r, _)| r.to_wire()),
                 );
@@ -175,7 +175,7 @@ impl Detector {
     ) -> BTreeSet<String> {
         let mut out: BTreeSet<String> = known.keys().cloned().collect();
         out.extend(
-            scan::walk(&project.folder, &RelPath::root(), &self.state.rules)
+            scan::walk(&project.folder, &RelPath::root(), &self.state.rules())
                 .into_iter()
                 .map(|(r, _)| r.to_wire()),
         );
@@ -374,6 +374,31 @@ mod tests {
             .unwrap();
         f.paths(&["a.md"]);
         assert_eq!(f.sink.take(), batch(&[("a.md", Updated)]));
+    }
+
+    #[test]
+    fn changing_exclusions_rebaselines_silently() {
+        use crate::domain::ExclusionRules;
+        let f = Fixture::new();
+        f.write("keep.md", "k");
+        f.write("scratch/x.md", "x");
+        f.write(".notes/hidden.md", "h");
+        f.detector.handle(&Msg::Baseline(f.id)).unwrap();
+        assert_eq!(f.known(), ["keep.md", "scratch/x.md"]);
+
+        // Hide "scratch", show hidden folders: re-baseline reports nothing.
+        f.state
+            .set_rules(ExclusionRules::from_patterns(&["scratch"]).unwrap())
+            .unwrap();
+        f.detector.handle(&Msg::Baseline(f.id)).unwrap();
+        assert!(f.sink.take().is_empty());
+        assert_eq!(f.known(), [".notes/hidden.md", "keep.md"]);
+
+        // Changes now follow the new rules.
+        f.write("scratch/y.md", "y");
+        f.write(".notes/hidden.md", "h2");
+        f.paths(&["scratch/y.md", ".notes/hidden.md"]);
+        assert_eq!(f.sink.take(), batch(&[(".notes/hidden.md", Updated)]));
     }
 
     #[test]

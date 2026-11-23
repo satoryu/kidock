@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::domain::{DomainError, ExclusionRules, Project, ProjectId, RootFolder};
 use crate::infra::detector::Msg;
@@ -23,8 +23,12 @@ pub struct AppState {
     watchers: Mutex<Option<Watchers>>,
     /// Cached `notifications.enabled` setting (read on every notification).
     notifications_enabled: AtomicBool,
-    pub rules: ExclusionRules,
+    /// Current exclusion rules; callers take a snapshot per operation.
+    rules: RwLock<Arc<ExclusionRules>>,
 }
+
+/// Settings key for the exclusion patterns (JSON array of strings; absent = defaults).
+pub const EXCLUSION_PATTERNS: &str = "exclusions.patterns";
 
 /// Settings key for the OS-notification toggle ("1" / "0"; absent = on).
 pub const NOTIFICATIONS_ENABLED: &str = "notifications.enabled";
@@ -52,13 +56,50 @@ impl AppState {
             .collect();
         let notifications_enabled =
             store.get_setting(NOTIFICATIONS_ENABLED)?.as_deref() != Some("0");
+        // Unreadable or invalid stored patterns fall back to the defaults.
+        let rules = store
+            .get_setting(EXCLUSION_PATTERNS)?
+            .and_then(|json| serde_json::from_str::<Vec<String>>(&json).ok())
+            .and_then(|p| ExclusionRules::from_patterns(&p).ok())
+            .unwrap_or_default();
         Ok(Self {
             store: Mutex::new(store),
             projects: RwLock::new(projects),
             watchers: Mutex::new(None),
             notifications_enabled: AtomicBool::new(notifications_enabled),
-            rules: ExclusionRules::default(),
+            rules: RwLock::new(Arc::new(rules)),
         })
+    }
+
+    /// A snapshot of the current exclusion rules.
+    pub fn rules(&self) -> Arc<ExclusionRules> {
+        self.rules.read().expect("rules lock poisoned").clone()
+    }
+
+    /// Persists and applies new rules, then silently re-baselines every
+    /// available project (no Inbox items or notifications).
+    pub fn set_rules(&self, rules: ExclusionRules) -> Result<(), DomainError> {
+        let json = serde_json::to_string(rules.patterns())
+            .map_err(|e| DomainError::Storage(e.to_string()))?;
+        self.store().set_setting(EXCLUSION_PATTERNS, &json)?;
+        *self.rules.write().expect("rules lock poisoned") = Arc::new(rules);
+        let ids: Vec<ProjectId> = self
+            .projects_read()
+            .values()
+            .filter(|p| p.available)
+            .map(|p| p.id)
+            .collect();
+        if let Some(w) = self
+            .watchers
+            .lock()
+            .expect("watchers lock poisoned")
+            .as_ref()
+        {
+            for id in ids {
+                w.send(Msg::Baseline(id));
+            }
+        }
+        Ok(())
     }
 
     pub fn notifications_enabled(&self) -> bool {
@@ -123,6 +164,31 @@ impl AppState {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn exclusion_rules_default_and_persist() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("kidock.db");
+        let state = AppState::load(Store::open(&db).unwrap()).unwrap();
+        assert_eq!(*state.rules(), ExclusionRules::default());
+        state
+            .set_rules(ExclusionRules::from_patterns(&["scratch"]).unwrap())
+            .unwrap();
+        assert!(state.rules().is_excluded("scratch"));
+        drop(state);
+        let reloaded = AppState::load(Store::open(&db).unwrap()).unwrap();
+        assert_eq!(reloaded.rules().patterns(), ["scratch"]);
+    }
+
+    #[test]
+    fn invalid_stored_patterns_fall_back_to_defaults() {
+        let store = Store::open_in_memory().unwrap();
+        store.set_setting(EXCLUSION_PATTERNS, "not json").unwrap();
+        assert_eq!(
+            *AppState::load(store).unwrap().rules(),
+            ExclusionRules::default()
+        );
+    }
 
     #[test]
     fn notifications_toggle_defaults_on_and_persists() {

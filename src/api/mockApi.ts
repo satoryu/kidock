@@ -35,6 +35,32 @@ type MockOptions = {
 
 const MAX_NAME_CHARS = 100;
 
+/** Mirrors `DEFAULT_PATTERNS` in src-tauri/src/domain/filter.rs. */
+export const DEFAULT_EXCLUSIONS = [
+  ".git",
+  "node_modules",
+  ".*",
+  "*~",
+  "*.tmp",
+  "*.temp",
+  "*.swp",
+  "*.swo",
+  "*.part",
+  "*.crdownload",
+];
+
+/** Glob match of a whole name (`*`, `?`), ASCII case-insensitive. */
+function globMatch(pattern: string, name: string): boolean {
+  const re = new RegExp(
+    `^${pattern
+      .split("")
+      .map((c) => (c === "*" ? ".*" : c === "?" ? "." : c.replace(/[\\^$.|+()[\]{}]/g, "\\$&")))
+      .join("")}$`,
+    "i",
+  );
+  return re.test(name);
+}
+
 /** The mock adds test/dev controls on top of `KidockApi`. */
 export type MockApi = KidockApi & {
   /**
@@ -76,6 +102,8 @@ export function createMockApi(
   const openListeners = new Set<(request: OpenRequest) => void>();
   let notificationsEnabled = true;
   const openedUrls: string[] = [];
+  let exclusions = [...DEFAULT_EXCLUSIONS];
+  const excluded = (name: string) => exclusions.some((p) => globMatch(p, name));
   type Item = Omit<InboxItem, "projectName">;
   const inbox = new Map<string, Item>();
   const key = (projectId: number, relPath: string) => `${projectId}\n${relPath}`;
@@ -198,6 +226,7 @@ export function createMockApi(
       const children = new Map<string, TreeEntry>();
       for (const path of Object.keys(files)) {
         if (!path.startsWith(prefix)) continue;
+        if (path.split("/").some(excluded)) continue;
         const [name, ...rest] = path.slice(prefix.length).split("/");
         const kind = rest.length > 0 ? "dir" : "markdown";
         children.set(name, { name, relPath: prefix + name, kind });
@@ -228,6 +257,21 @@ export function createMockApi(
         throw new KidockError("InvalidPath", "only http(s) and mailto links can be opened");
       }
       openedUrls.push(url);
+    },
+
+    async getExclusions() {
+      await wait();
+      return { patterns: [...exclusions], defaults: [...DEFAULT_EXCLUSIONS] };
+    },
+
+    async setExclusions(patterns) {
+      await wait();
+      const cleaned = patterns.map((p) => p.trim()).filter(Boolean);
+      const bad = cleaned.find((p) => /[\\/]/.test(p));
+      if (bad) throw new KidockError("InvalidPath", `patterns cannot contain '/' or '\\': ${bad}`);
+      if (cleaned.length > 200) throw new KidockError("InvalidPath", "at most 200 patterns are allowed");
+      exclusions = cleaned;
+      return [...exclusions];
     },
 
     async getNotificationsEnabled() {

@@ -4,12 +4,17 @@ import type { InboxCounts, InboxItem, ProjectInfo } from "../api/types";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { CenterBar } from "./CenterBar";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { ExclusionsDialog } from "./ExclusionsDialog";
 import { messageFor } from "./errors";
 import { InboxList } from "./InboxList";
 import { Sidebar, type View } from "./Sidebar";
 import { Viewer, type OpenFile } from "./Viewer";
 
-type Dialog = { kind: "add" } | { kind: "delete"; project: ProjectInfo } | null;
+type Dialog =
+  | { kind: "add" }
+  | { kind: "delete"; project: ProjectInfo }
+  | { kind: "exclusions" }
+  | null;
 
 /** Three-pane layout: sidebar | center bar | main area. */
 export function App() {
@@ -178,6 +183,7 @@ export function App() {
           onDeleteProject={(project) => setDialog({ kind: "delete", project })}
           notificationsEnabled={notificationsEnabled}
           onToggleNotifications={() => void toggleNotifications()}
+          onEditExclusions={() => setDialog({ kind: "exclusions" })}
         />
         {loadError && (
           <div className="sidebar-error" role="alert">
@@ -216,6 +222,15 @@ export function App() {
 
       {dialog?.kind === "add" && (
         <AddProjectDialog onCancel={() => setDialog(null)} onAdded={(p) => void onAdded(p)} />
+      )}
+      {dialog?.kind === "exclusions" && (
+        <ExclusionsDialog
+          onCancel={() => setDialog(null)}
+          onSaved={() => {
+            setDialog(null);
+            setTreeVersion((n) => n + 1);
+          }}
+        />
       )}
       {dialog?.kind === "delete" && (
         <ConfirmDeleteDialog
