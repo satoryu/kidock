@@ -2,21 +2,16 @@ use std::path::{Path, PathBuf};
 
 use super::RelPath;
 
-/// Identifies a registered folder. One root exists in #1; #3 adds more.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RootId(pub u64);
-
 /// A registered folder. `canonical_path` must already be canonicalized by the
 /// caller (infra), so that containment checks compare like with like.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootFolder {
-    pub id: RootId,
     pub canonical_path: PathBuf,
 }
 
 impl RootFolder {
-    pub fn new(id: RootId, canonical_path: PathBuf) -> Self {
-        Self { id, canonical_path }
+    pub fn new(canonical_path: PathBuf) -> Self {
+        Self { canonical_path }
     }
 
     /// The folder's own name, falling back to the full path (e.g. for `/` or `C:\`).
@@ -44,7 +39,7 @@ mod tests {
     use super::*;
 
     fn root(p: &str) -> RootFolder {
-        RootFolder::new(RootId(1), PathBuf::from(p))
+        RootFolder::new(PathBuf::from(p))
     }
 
     #[test]
