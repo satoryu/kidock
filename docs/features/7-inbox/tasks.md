@@ -18,5 +18,9 @@ Complete in order, with TDD for logic.
 
 ## 3. Verification and docs
 
-- [ ] 3.1 All checks pass; browser check with the mock (headless Chrome); real app on macOS (`tauri dev`): changes → `inbox_items` rows, restart keeps them.
+- [x] 3.1 All checks pass; browser check with the mock (headless Chrome); real app on macOS (`tauri dev`): changes → `inbox_items` rows, restart keeps them. → 152 frontend tests (+ scripts) and 109 Rust unit tests + IPC + real-watcher tests. Headless Chrome with the mock: list, badges, open → read, mark all as read, dark mode. Real app (`tauri dev`, macOS) with a project registered in the DB:
+  - schema v3; the baseline adds nothing
+  - a create and an atomic save each give one unread item
+  - a re-edit keeps one item, moved to the top and still `created`
+  - the Inbox survives a restart
 - [ ] 3.2 `CLAUDE.md` updates. PR, self-review, merge through the CI gate.
