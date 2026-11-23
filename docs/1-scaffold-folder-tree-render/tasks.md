@@ -44,4 +44,4 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 - [x] 5.3 Windows: try `cargo check --target x86_64-pc-windows-msvc` locally. If that is not possible, record it as deferred to #2 CI. → Deferred to #2 CI (cross-checking needs the MSVC target and SDK; not set up locally).
 - [x] 5.3a Production CSP + `freezePrototype` emulation: mock build served with the exact CSP header and `Object.freeze(Object.prototype)` before app scripts, driven by headless Chrome. Rendering, Shiki, and sanitization work; no script executes.
 - [x] 5.4 Update `CLAUDE.md`: Tech Stacks (finalized), Testing commands, and the dev command in Manual Verification.
-- [ ] 5.5 Open the PR with a Test Plan (noting the OS for each item), then self-review and fix findings.
+- [x] 5.5 Open the PR with a Test Plan (noting the OS for each item), then self-review and fix findings.
