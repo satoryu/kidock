@@ -87,6 +87,10 @@ export interface KidockApi {
   /** Marks a file's Inbox item read; resolves `false` if it had none or was read. */
   markRead(projectId: number, relPath: string): Promise<boolean>;
   markAllRead(): Promise<number>;
+  /** URL serving a project file (images in rendered Markdown). Synchronous. */
+  assetUrl(projectId: number, relPath: string): string;
+  /** Opens an http(s) link in the browser, or mailto in the mail client (others are refused). */
+  openExternal(url: string): Promise<void>;
   getNotificationsEnabled(): Promise<boolean>;
   setNotificationsEnabled(enabled: boolean): Promise<void>;
   /** Subscribes to "open this" requests from notification clicks. */

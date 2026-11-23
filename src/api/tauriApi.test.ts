@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockIPC } from "@tauri-apps/api/mocks";
+import { mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import { tauriApi, toKidockError } from "./tauriApi";
 import { KidockError } from "./types";
@@ -119,6 +119,27 @@ describe("tauriApi.onChanges", () => {
     await new Promise((r) => setTimeout(r, 0));
     await emit("kidock://changes", [change]);
     expect(seen).toEqual([]);
+  });
+});
+
+describe("tauriApi links and assets", () => {
+  it("builds kidock-asset URLs with the project id and path encoded together", () => {
+    mockConvertFileSrc("macos");
+    expect(tauriApi.assetUrl(7, "docs/img/a b.png")).toBe(
+      "kidock-asset://localhost/7%2Fdocs%2Fimg%2Fa%20b.png",
+    );
+    mockConvertFileSrc("windows");
+    expect(tauriApi.assetUrl(7, "a.png")).toBe("http://kidock-asset.localhost/7%2Fa.png");
+  });
+
+  it("opens external links through the backend command", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+    await tauriApi.openExternal("https://example.com");
+    expect(calls).toEqual([{ cmd: "open_external", payload: { url: "https://example.com" } }]);
   });
 });
 

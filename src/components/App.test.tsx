@@ -347,6 +347,26 @@ describe("App", () => {
     });
   });
 
+  it("follows a link to another .md file in the same project and marks it read", async () => {
+    const api = createMockApi({
+      projects: [
+        {
+          name: "reports",
+          path: "/mock/reports",
+          files: { "README.md": "# Reports\n\n[see notes](notes/n.md)", "notes/n.md": "# Note" },
+        },
+      ],
+    });
+    renderWithApi(<App />, api);
+    await screen.findByRole("list", { name: "Projects" });
+    act(() => api.emitChanges([{ projectId: 1, relPath: "notes/n.md", kind: "created" }]));
+    await userEvent.click(projectButton("reports"));
+    await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+    await userEvent.click(await screen.findByRole("link", { name: "see notes" }));
+    expect(await screen.findByRole("heading", { name: "Note" })).toBeInTheDocument();
+    await waitFor(async () => expect((await api.inboxCounts()).total).toBe(0));
+  });
+
   describe("OS notifications", () => {
     it("toggles notifications and persists the choice", async () => {
       const api = createMockApi(seed());

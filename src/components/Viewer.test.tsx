@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ApiProvider } from "../api/context";
 import { createMockApi } from "../api/mockApi";
@@ -123,6 +123,66 @@ describe("Viewer", () => {
       releaseFirst();
       await new Promise((r) => setTimeout(r, 20));
       expect(screen.queryByRole("heading", { name: "Stale" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("links", () => {
+    // jsdom has no scrollIntoView; the tests below stub it.
+    afterEach(() => {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+    const linkFiles = {
+      "docs/report.md":
+        "# Report\n\n[next](next.md#steps) [web](https://example.com) [mail](mailto:a@b.c) [data](data.csv) [jump](#later)\n\n## Later",
+      "docs/next.md": "# Next",
+    };
+    const linkApi = () =>
+      createMockApi({ projects: [{ name: "p", path: "/mock/p", files: linkFiles }] });
+
+    it("routes .md links to onOpenLink with the resolved path and anchor", async () => {
+      const onOpenLink = vi.fn();
+      renderWithApi(
+        <Viewer file={{ projectId: 1, relPath: "docs/report.md" }} placeholder="" onOpenLink={onOpenLink} />,
+        linkApi(),
+      );
+      const link = await screen.findByRole("link", { name: "next" });
+      expect(fireEvent.click(link)).toBe(false); // navigation prevented
+      expect(onOpenLink).toHaveBeenCalledWith("docs/next.md", "steps");
+    });
+
+    it("opens http(s) and mailto links externally and leaves other local files inert", async () => {
+      const mock = linkApi();
+      const onOpenLink = vi.fn();
+      renderWithApi(
+        <Viewer file={{ projectId: 1, relPath: "docs/report.md" }} placeholder="" onOpenLink={onOpenLink} />,
+        mock,
+      );
+      fireEvent.click(await screen.findByRole("link", { name: "web" }));
+      fireEvent.click(screen.getByRole("link", { name: "mail" }));
+      expect(fireEvent.click(screen.getByRole("link", { name: "data" }))).toBe(false);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mock.openedUrls).toEqual(["https://example.com", "mailto:a@b.c"]);
+      expect(onOpenLink).not.toHaveBeenCalled();
+    });
+
+    it("scrolls to in-document anchors", async () => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      renderWithApi(<Viewer file={{ projectId: 1, relPath: "docs/report.md" }} placeholder="" />, linkApi());
+      fireEvent.click(await screen.findByRole("link", { name: "jump" }));
+      expect(scroll).toHaveBeenCalledOnce();
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole("heading", { name: "Later" }));
+    });
+
+    it("scrolls to the anchor of a newly opened file", async () => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      renderWithApi(
+        <Viewer file={{ projectId: 1, relPath: "docs/report.md", anchor: "later" }} placeholder="" />,
+        linkApi(),
+      );
+      await screen.findByRole("heading", { name: "Later" });
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole("heading", { name: "Later" }));
     });
   });
 

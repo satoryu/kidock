@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -27,6 +27,9 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set<ErrorKind>([
   "Io",
   "Storage",
 ]);
+
+/** Kidock's URI scheme for project files (see src-tauri/src/infra/asset_protocol.rs). */
+export const ASSET_SCHEME = "kidock-asset";
 
 /** Backend event carrying `FileChange[]` batches. */
 export const CHANGES_EVENT = "kidock://changes";
@@ -86,6 +89,11 @@ export const tauriApi: KidockApi = {
   inboxCounts: () => call<InboxCounts>("inbox_counts"),
   markRead: (projectId, relPath) => call<boolean>("mark_read", { projectId, rel: relPath }),
   markAllRead: () => call<number>("mark_all_read"),
+  // The whole "projectId/relPath" is one encoded path segment; Rust decodes it.
+  assetUrl: (projectId, relPath) => convertFileSrc(`${projectId}/${relPath}`, ASSET_SCHEME),
+  openExternal: async (url) => {
+    await call<null>("open_external", { url });
+  },
   getNotificationsEnabled: () => call<boolean>("get_notifications_enabled"),
   setNotificationsEnabled: async (enabled) => {
     await call<null>("set_notifications_enabled", { enabled });

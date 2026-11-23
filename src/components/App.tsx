@@ -204,7 +204,14 @@ export function App() {
         )}
       </div>
       <main className="pane pane-main">
-        <Viewer file={openFile} version={fileVersion} placeholder={placeholder} />
+        <Viewer
+          file={openFile}
+          version={fileVersion}
+          placeholder={placeholder}
+          onOpenLink={(relPath, anchor) =>
+            openFile && open({ projectId: openFile.projectId, relPath, anchor })
+          }
+        />
       </main>
 
       {dialog?.kind === "add" && (

@@ -25,7 +25,7 @@
         "default-src": "'self'",
         "script-src": "'self'",
         "style-src": "'self' 'unsafe-inline'",
-        "img-src": "'self' asset: http://asset.localhost data:",
+        "img-src": "'self' kidock-asset: http://kidock-asset.localhost data:",
         "font-src": "'self'",
         "connect-src": "ipc: http://ipc.localhost",
         "object-src": "'none'",
@@ -33,11 +33,7 @@
         "base-uri": "'none'",
         "form-action": "'none'"
       },
-      "freezePrototype": true,
-      "assetProtocol": {
-        "enable": true,
-        "scope": []
-      }
+      "freezePrototype": true
     }
   },
   "bundle": {

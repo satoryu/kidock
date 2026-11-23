@@ -112,6 +112,12 @@ fn project_lifecycle_over_ipc() {
     );
     assert_eq!(invoke(&webview, "mark_all_read", json!({})), Ok(json!(0)));
 
+    // External links: only http(s) may leave the app.
+    for url in ["javascript:alert(1)", "file:///etc/passwd"] {
+        let err = invoke(&webview, "open_external", json!({ "url": url })).unwrap_err();
+        assert_eq!(err["kind"], json!("InvalidPath"), "{url}");
+    }
+
     // Notification toggle.
     assert_eq!(
         invoke(&webview, "get_notifications_enabled", json!({})),

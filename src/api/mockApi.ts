@@ -44,6 +44,8 @@ export type MockApi = KidockApi & {
   emitChanges(changes: Array<FileChange & { content?: string }>, nowMs?: number): void;
   /** Simulates a click on an OS notification. */
   emitOpenRequest(request: OpenRequest): void;
+  /** URLs passed to `openExternal`, for assertions. */
+  readonly openedUrls: string[];
 };
 
 /**
@@ -73,6 +75,7 @@ export function createMockApi(
   const listeners = new Set<(changes: FileChange[]) => void>();
   const openListeners = new Set<(request: OpenRequest) => void>();
   let notificationsEnabled = true;
+  const openedUrls: string[] = [];
   type Item = Omit<InboxItem, "projectName">;
   const inbox = new Map<string, Item>();
   const key = (projectId: number, relPath: string) => `${projectId}\n${relPath}`;
@@ -208,6 +211,23 @@ export function createMockApi(
           a.name.toLowerCase().localeCompare(b.name.toLowerCase()) ||
           (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
       );
+    },
+
+    assetUrl(projectId, relPath) {
+      // A visible placeholder: the mock has no image bytes.
+      const label = `${projectId}/${relPath}`.replace(/[<>&"']/g, "");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="60"><rect width="100%" height="100%" fill="#ddd"/><text x="8" y="35" font-size="12">${label}</text></svg>`;
+      return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    },
+
+    openedUrls,
+
+    async openExternal(url) {
+      await wait();
+      if (!/^(?:https?:\/\/|mailto:)./i.test(url)) {
+        throw new KidockError("InvalidPath", "only http(s) and mailto links can be opened");
+      }
+      openedUrls.push(url);
     },
 
     async getNotificationsEnabled() {

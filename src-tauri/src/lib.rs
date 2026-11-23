@@ -35,6 +35,7 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::mark_all_read,
         commands::get_notifications_enabled,
         commands::set_notifications_enabled,
+        commands::open_external,
     ])
 }
 
@@ -43,6 +44,31 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
+        .register_asynchronous_uri_scheme_protocol(
+            infra::asset_protocol::SCHEME,
+            |ctx, request, responder| {
+                let app = ctx.app_handle().clone();
+                let path = request.uri().path().to_string();
+                // File reads must not block the protocol handler.
+                std::thread::spawn(move || {
+                    let served = match app.try_state::<Arc<state::AppState>>() {
+                        Some(state) => infra::asset_protocol::serve(&state, &path),
+                        None => infra::asset_protocol::Served::unavailable(),
+                    };
+                    let response = tauri::http::Response::builder()
+                        .status(served.status)
+                        .header("Content-Type", served.content_type)
+                        .header("X-Content-Type-Options", "nosniff")
+                        .header("Cache-Control", "no-cache")
+                        .body(served.body);
+                    match response {
+                        Ok(r) => responder.respond(r),
+                        Err(e) => eprintln!("kidock: failed to build an asset response: {e}"),
+                    }
+                });
+            },
+        )
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -75,7 +101,6 @@ pub fn run() {
                 .cloned()
                 .collect();
             for project in available {
-                infra::asset_scope::allow_root(app.handle(), &project.folder)?;
                 // Projects from before #6 were never baselined: record them
                 // silently instead of reporting every file as created.
                 let msg = if state.store().is_baselined(project.id)? {
