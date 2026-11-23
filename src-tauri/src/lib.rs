@@ -36,6 +36,8 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::get_notifications_enabled,
         commands::set_notifications_enabled,
         commands::open_external,
+        commands::get_exclusions,
+        commands::set_exclusions,
     ])
 }
 
