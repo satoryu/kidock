@@ -1,9 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { useApi } from "../api/context";
-import { renderMarkdown } from "../markdown/render";
+import { slugify } from "../markdown/paths";
+import { HEADING_ID_PREFIX, renderMarkdown } from "../markdown/render";
 import { messageFor } from "./errors";
 
-export type OpenFile = { projectId: number; relPath: string };
+export type OpenFile = {
+  projectId: number;
+  relPath: string;
+  /** Heading to scroll to once the file is shown (from a `file.md#anchor` link). */
+  anchor?: string;
+};
 
 type ViewerProps = {
   file: OpenFile | null;
@@ -11,6 +17,8 @@ type ViewerProps = {
   version?: number;
   /** Shown when no file is open. */
   placeholder: string;
+  /** A link to another `.md` file in the same project was clicked. */
+  onOpenLink?: (relPath: string, anchor?: string) => void;
 };
 
 type ViewState =
@@ -19,7 +27,7 @@ type ViewState =
   | { status: "ok"; html: string }
   | { status: "error"; error: unknown };
 
-export function Viewer({ file, version = 0, placeholder }: ViewerProps) {
+export function Viewer({ file, version = 0, placeholder, onOpenLink }: ViewerProps) {
   const api = useApi();
   const [view, setView] = useState<ViewState>({ status: "idle" });
   const rootRef = useRef<HTMLDivElement>(null);
@@ -29,6 +37,9 @@ export function Viewer({ file, version = 0, placeholder }: ViewerProps) {
 
   const projectId = file?.projectId;
   const relPath = file?.relPath;
+  const anchor = file?.anchor;
+  /** Anchor to scroll to once the next document is in the DOM. */
+  const pendingAnchor = useRef<string | null>(null);
 
   // The scrollable pane that holds the viewer (`.pane-main` in the app).
   const scroller = () => rootRef.current?.parentElement ?? null;
@@ -45,12 +56,21 @@ export function Viewer({ file, version = 0, placeholder }: ViewerProps) {
     setView((prev) => ({ status: "loading", html: "html" in prev ? prev.html : undefined }));
     api
       .readMarkdown(projectId, relPath)
-      .then(renderMarkdown)
+      .then((text) =>
+        renderMarkdown(text, {
+          projectId,
+          relPath,
+          assetUrl: (p, r) => api.assetUrl(p, r),
+        }),
+      )
       .then(
         (html) => {
           if (cancelled) return;
-          // Same file reloaded: keep the reading position. Another file: start at the top.
-          restoreTo.current = shownKey.current === key ? (scroller()?.scrollTop ?? 0) : 0;
+          // Same file reloaded: keep the reading position. Another file: start at
+          // the top, or at the requested anchor.
+          const reload = shownKey.current === key;
+          restoreTo.current = reload ? (scroller()?.scrollTop ?? 0) : 0;
+          pendingAnchor.current = reload ? null : (anchor ?? null);
           shownKey.current = key;
           setView({ status: "ok", html });
         },
@@ -63,19 +83,58 @@ export function Viewer({ file, version = 0, placeholder }: ViewerProps) {
     return () => {
       cancelled = true;
     };
+    // `anchor` is read only when a new file opens; it must not trigger a reload.
   }, [api, projectId, relPath, version]);
 
   useLayoutEffect(() => {
     const el = scroller();
-    if (view.status === "ok" && el && restoreTo.current !== null) {
+    if (view.status !== "ok" || !el) return;
+    if (restoreTo.current !== null) {
       el.scrollTop = restoreTo.current;
       restoreTo.current = null;
     }
+    if (pendingAnchor.current !== null) {
+      scrollToAnchor(pendingAnchor.current);
+      pendingAnchor.current = null;
+    }
   }, [view]);
 
-  // Never let the WebView navigate away. In-app .md links and external links come in #11.
+  // A same-file anchor change (e.g. two links into one file) scrolls without reloading.
+  useEffect(() => {
+    if (anchor && view.status === "ok") scrollToAnchor(anchor);
+  }, [anchor]);
+
+  function scrollToAnchor(raw: string) {
+    let name = raw;
+    try {
+      name = decodeURIComponent(raw);
+    } catch {
+      // keep the raw form
+    }
+    const root = rootRef.current;
+    const target =
+      root?.querySelector(`[id="${CSS.escape(HEADING_ID_PREFIX + name)}"]`) ??
+      root?.querySelector(`[id="${CSS.escape(HEADING_ID_PREFIX + slugify(name))}"]`);
+    target?.scrollIntoView?.({ block: "start" });
+  }
+
+  // The WebView never navigates: links are routed by the attributes that
+  // `sanitizeHtml` set (see src/markdown/sanitize.ts).
   const onClick = (e: MouseEvent) => {
-    if ((e.target as Element).closest("a")) e.preventDefault();
+    const a = (e.target as Element).closest("a");
+    if (!a) return;
+    e.preventDefault();
+    const md = a.getAttribute("data-md-link");
+    const linkAnchor = a.getAttribute("data-anchor") ?? undefined;
+    if (md) {
+      onOpenLink?.(md, linkAnchor);
+    } else if (linkAnchor !== undefined) {
+      scrollToAnchor(linkAnchor);
+    } else if (a.hasAttribute("data-external")) {
+      const href = a.getAttribute("href");
+      if (href) void api.openExternal(href).catch(() => {});
+    }
+    // Anything else (other local files) stays inert.
   };
 
   return (

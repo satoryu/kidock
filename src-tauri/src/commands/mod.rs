@@ -267,13 +267,16 @@ pub fn remove_project(
     do_remove_project(&state, ProjectId(project_id))
 }
 
-/// Opens an `http(s)` link in the OS browser. The WebView has no opener
-/// permission of its own; this is the only way out, and it refuses other schemes.
+/// Opens an `http(s)` link in the OS browser (or `mailto:` in the mail client).
+/// The WebView has no opener permission of its own; this is the only way out,
+/// and it refuses other schemes.
 #[tauri::command(async)]
 pub fn open_external<R: Runtime>(app: AppHandle<R>, url: String) -> Result<(), CommandError> {
     use tauri_plugin_opener::OpenerExt;
     if !is_external_url(&url) {
-        return Err(DomainError::InvalidPath("only http(s) links can be opened".into()).into());
+        return Err(
+            DomainError::InvalidPath("only http(s) and mailto links can be opened".into()).into(),
+        );
     }
     app.opener()
         .open_url(url, None::<&str>)

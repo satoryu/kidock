@@ -21,13 +21,14 @@ pub fn percent_decode(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Whether `url` may be handed to the OS browser: `http`/`https` only, with
-/// no whitespace or control characters.
+/// Whether `url` may be handed to the OS: `http`/`https` (browser) or
+/// `mailto` (mail client), with no whitespace or control characters.
 pub fn is_external_url(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();
-    (lower.starts_with("http://") || lower.starts_with("https://"))
-        && url.len() > "https://".len()
-        && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+    let rest = ["https://", "http://", "mailto:"]
+        .iter()
+        .find_map(|p| lower.strip_prefix(p));
+    rest.is_some_and(|r| !r.is_empty()) && !url.chars().any(|c| c.is_whitespace() || c.is_control())
 }
 
 #[cfg(test)]
@@ -35,13 +36,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_http_and_https_urls_are_external() {
+    fn only_http_https_and_mailto_urls_are_external() {
         assert!(is_external_url("https://example.com/a?b=c#d"));
         assert!(is_external_url("HTTP://example.com"));
+        assert!(is_external_url("mailto:someone@example.com"));
         for bad in [
             "javascript:alert(1)",
             "file:///etc/passwd",
-            "mailto:x@y",
+            "mailto:",
             "https://",
             "https://exa mple.com",
             "https://a\nb",

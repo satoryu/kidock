@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { renderMarkdown } from "./render";
 
+/** Parses rendered HTML for structural assertions. */
+function dom(html: string): HTMLElement {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div;
+}
+
 async function render(src: string): Promise<HTMLElement> {
   const el = document.createElement("div");
   el.innerHTML = await renderMarkdown(src);
@@ -118,5 +125,68 @@ describe("renderMarkdown: sanitization", () => {
     const el = await render("[a](https://example.com) [b](mailto:a@b.c) [c](./other.md) [d](#sec)");
     const hrefs = [...el.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual(["https://example.com", "mailto:a@b.c", "./other.md", "#sec"]);
+  });
+});
+
+describe("renderMarkdown: heading ids", () => {
+  it("adds prefixed GitHub-style ids, unique per document", async () => {
+    const html = await renderMarkdown("# Next steps\n\n## Next steps\n\n### Hi!");
+    const ids = [...dom(html).querySelectorAll("h1, h2, h3")].map((h) => h.id);
+    expect(ids).toEqual(["user-content-next-steps", "user-content-next-steps-1", "user-content-hi"]);
+  });
+});
+
+describe("renderMarkdown: relative images and links", () => {
+  const doc = {
+    projectId: 7,
+    relPath: "docs/report.md",
+    assetUrl: (p: number, r: string) => `asset://${p}/${r}`,
+  };
+
+  it("serves relative images from the project and blocks escapes and remote images", async () => {
+    const html = await renderMarkdown(
+      "![a](img/a.png) ![b](../top.png) ![c](../../escape.png) ![d](https://tracker.example/p.gif) ![e](data:image/png;base64,AAAA)",
+      doc,
+    );
+    const imgs = [...dom(html).querySelectorAll("img")];
+    expect(imgs.map((i) => i.getAttribute("src"))).toEqual([
+      "asset://7/docs/img/a.png",
+      "asset://7/top.png",
+      null,
+      null,
+      "data:image/png;base64,AAAA",
+    ]);
+    expect(imgs[2].getAttribute("data-blocked-src")).toBe("../../escape.png");
+    expect(imgs[3].classList.contains("blocked-image")).toBe(true);
+  });
+
+  it("classifies links for the viewer", async () => {
+    const html = await renderMarkdown(
+      "[a](next.md) [b](../plan.md#steps) [c](#local) [d](https://example.com) [e](mailto:x@y.z) [f](data.csv) [g](../../out.md)",
+      doc,
+    );
+    const links = [...dom(html).querySelectorAll("a")].map((a) => ({
+      md: a.getAttribute("data-md-link"),
+      anchor: a.getAttribute("data-anchor"),
+      external: a.hasAttribute("data-external"),
+      local: a.getAttribute("data-local-link"),
+    }));
+    expect(links).toEqual([
+      { md: "docs/next.md", anchor: null, external: false, local: null },
+      { md: "plan.md", anchor: "steps", external: false, local: null },
+      { md: null, anchor: "local", external: false, local: null },
+      { md: null, anchor: null, external: true, local: null },
+      { md: null, anchor: null, external: true, local: null },
+      { md: null, anchor: null, external: false, local: "docs/data.csv" },
+      { md: null, anchor: null, external: false, local: "../../out.md" },
+    ]);
+  });
+
+  it("still neutralizes javascript: links when a document context is given", async () => {
+    const html = await renderMarkdown('[x](javascript:alert(1)) <a href="javascript:alert(2)">y</a>', doc);
+    const links = [...dom(html).querySelectorAll("a")];
+    expect(links).toHaveLength(1); // markdown-it refuses the first; the raw one survives as text-only
+    expect(links[0].getAttribute("href")).toBeNull();
+    expect(links[0].attributes).toHaveLength(0);
   });
 });
