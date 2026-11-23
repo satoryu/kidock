@@ -68,3 +68,21 @@ sequenceDiagram
 ## Domain Models
 
 None (rendering only).
+
+## Open decision: Mermaid vs. `freezePrototype` (owner)
+
+Found during the production-CSP emulation: with Tauri's `freezePrototype: true` (enabled since #1), **Mermaid cannot load in the built app**. Its date library **dayjs** assigns `proto.valueOf = function…` at module load. Once `Object.prototype` is frozen, that assignment throws in strict mode ("Cannot assign to read only property 'valueOf'"), which is the classic *override mistake*.
+
+Measured in headless Chrome with the production CSP:
+- **With** the frozen prototype: the Mermaid import fails. Kidock now shows an error box for each diagram instead of the raw source.
+- **Without** it: all sample diagrams render, the invalid one shows its error box, and the injection sample leaves no `<script>`, `on*` attributes, `foreignObject`, or `javascript:` links, and opens no dialogs. The only CSP report is the known harmless `script-src-attr` parse report from #1.
+
+Options:
+
+| Option | Effect |
+|---|---|
+| A. Keep `freezePrototype` (current state of this PR) | Safe default; diagrams show an error box in the built app (they work in `tauri dev`, where the freeze does not apply) |
+| B. Turn off `freezePrototype` | Diagrams work. The primary defenses (DOMPurify on all HTML and on Mermaid's SVG, a CSP without inline scripts or `eval`, validated commands) are unchanged. Mermaid's known pollution vector, config merging from diagram source, is already neutralized by `stripConfig` (removes `%%{init}%%` directives and front-matter config) |
+| C. Patch dayjs at build time so it defines properties instead of assigning them | Keeps both, but is brittle across dependency updates |
+
+This is a security setting, so the change was **not** made unattended. The PR stays open until the owner picks an option.

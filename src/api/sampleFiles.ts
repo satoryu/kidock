@@ -54,6 +54,49 @@ npm run tauri dev
 plain fallback <b>not bold</b>
 \`\`\`
 `,
+  "diagrams/mermaid.md": `# Mermaid samples
+
+## Flowchart
+
+\`\`\`mermaid
+graph TD
+  A[Agent writes report] --> B{Kidock detects}
+  B -->|created| C[Inbox: New]
+  B -->|updated| D[Inbox: Updated]
+\`\`\`
+
+## Sequence
+
+\`\`\`mermaid
+sequenceDiagram
+  Agent->>Kidock: report.md
+  Kidock-->>Owner: notification
+\`\`\`
+
+## Class
+
+\`\`\`mermaid
+classDiagram
+  class Project { +name +path }
+  class InboxItem { +relPath +read }
+  Project "1" --> "*" InboxItem
+\`\`\`
+
+## Injection attempt (must stay inert)
+
+\`\`\`mermaid
+graph LR
+  X["<img src=x onerror=alert('mermaid')>"] --> Y["<script>alert('label')</script>"]
+  click X "javascript:alert('click')"
+\`\`\`
+
+## Invalid diagram
+
+\`\`\`mermaid
+graph TD
+  this is not --> valid -->
+\`\`\`
+`,
   "notes/meeting.md": "# 議事録\n\n- 日本語のファイル名と本文の表示確認\n- スペースを含むパスも確認する\n",
   "security/xss.md": `# XSS samples
 
