@@ -1,47 +1,181 @@
 import { describe, expect, it } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMockApi } from "../api/mockApi";
-import { renderWithApi } from "../test/utils";
+import { createMockApi, type MockSeed } from "../api/mockApi";
+import { renderWithApi, spyApi } from "../test/utils";
 import { App } from "./App";
 
-const files = { "README.md": "# Readme", "notes/n.md": "# Note" };
+const seed = (): MockSeed => ({
+  projects: [
+    { name: "reports", path: "/mock/reports", files: { "README.md": "# Reports", "notes/n.md": "# Note" } },
+    { name: "agent", path: "/mock/agent", files: { "README.md": "# Agent" } },
+  ],
+  folders: { "/mock/new": { "x.md": "# X" }, "/mock/reports/sub": {} },
+});
+
+const projectList = () => screen.getByRole("list", { name: "Projects" });
+const projectButton = (name: string) =>
+  within(projectList()).getByRole("button", { name: new RegExp(`^${name}`) });
+
+async function renderApp(options?: Parameters<typeof createMockApi>[1], s: MockSeed = seed()) {
+  const spy = spyApi(createMockApi(s, options));
+  renderWithApi(<App />, spy.api);
+  await screen.findByRole("list", { name: "Projects" });
+  return spy;
+}
 
 describe("App", () => {
-  it("opens a folder, shows its tree, and renders a selected file", async () => {
-    renderWithApi(<App />, createMockApi(files));
-    expect(screen.getByText(/open a folder/i)).toBeInTheDocument();
+  it("starts on the Inbox with the project list in the sidebar", async () => {
+    await renderApp();
+    expect(screen.getByRole("button", { name: /inbox/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText(/no notifications yet/i)).toBeInTheDocument();
+    expect(within(projectList()).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      expect.stringContaining("agent"),
+      expect.stringContaining("reports"),
+    ]);
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: /open folder/i }));
+  it("prompts to add a project when there are none", async () => {
+    renderWithApi(<App />, createMockApi({}));
+    expect(await screen.findByText(/no projects yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/add a project to get started/i)).toBeInTheDocument();
+  });
+
+  it("shows a project's tree in the center bar and a file in the main area", async () => {
+    await renderApp();
+    await userEvent.click(projectButton("reports"));
     const tree = await screen.findByRole("tree");
-    expect(screen.getByText("reports")).toBeInTheDocument();
-
     await userEvent.click(within(tree).getByRole("treeitem", { name: "README.md" }));
-    expect(await screen.findByRole("heading", { name: "Readme" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
   });
 
-  it("does nothing when the picker is cancelled", async () => {
-    renderWithApi(<App />, createMockApi(files, { pickResult: null }));
-    await userEvent.click(screen.getByRole("button", { name: /open folder/i }));
-    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
-    expect(screen.getByText(/open a folder/i)).toBeInTheDocument();
-  });
-
-  it("resets the selection when another folder is opened", async () => {
-    renderWithApi(<App />, createMockApi(files));
-    await userEvent.click(screen.getByRole("button", { name: /open folder/i }));
+  it("resets the open file when switching projects", async () => {
+    await renderApp();
+    await userEvent.click(projectButton("reports"));
     await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
-    await screen.findByRole("heading", { name: "Readme" });
+    await screen.findByRole("heading", { name: "Reports" });
 
-    await userEvent.click(screen.getByRole("button", { name: /open folder/i }));
+    await userEvent.click(projectButton("agent"));
     expect(await screen.findByText(/select a markdown file/i)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+    expect(await screen.findByRole("heading", { name: "Agent" })).toBeInTheDocument();
   });
 
-  it("shows an error if the folder cannot be opened", async () => {
-    const api = createMockApi(files);
-    api.setRoot = () => Promise.reject(Object.assign(new Error("gone"), { kind: "NotFound" }));
+  describe("adding a project", () => {
+    it("adds with the folder name when no name is given, then selects it", async () => {
+      const { calls } = await renderApp({ pickResult: "/mock/new" });
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      const dialog = screen.getByRole("dialog", { name: "Add project" });
+      const add = within(dialog).getByRole("button", { name: "Add" });
+      expect(add).toBeDisabled();
+
+      await userEvent.click(within(dialog).getByRole("button", { name: /choose/i }));
+      expect(within(dialog).getByText("/mock/new")).toBeInTheDocument();
+      await userEvent.click(add);
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls.find((c) => c.method === "addProject")?.args).toEqual([null, "/mock/new"]);
+      expect(projectButton("new")).toHaveAttribute("aria-current", "page");
+      expect(await screen.findByRole("treeitem", { name: "x.md" })).toBeInTheDocument();
+    });
+
+    it("uses the given name", async () => {
+      await renderApp({ pickResult: "/mock/new" });
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      const dialog = screen.getByRole("dialog");
+      await userEvent.type(within(dialog).getByRole("textbox", { name: /project name/i }), "My notes");
+      await userEvent.click(within(dialog).getByRole("button", { name: /choose/i }));
+      await userEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+      expect(await within(projectList()).findByRole("button", { name: /^My notes/ })).toBeInTheDocument();
+    });
+
+    it("keeps the dialog open with an error for an overlapping folder", async () => {
+      await renderApp({ pickResult: "/mock/reports/sub" });
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      const dialog = screen.getByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: /choose/i }));
+      await userEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(/inside, or contains/i);
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("closes without changes on Cancel or Escape", async () => {
+      const { calls } = await renderApp();
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(calls.some((c) => c.method === "addProject")).toBe(false);
+    });
+
+    it("ignores a cancelled folder picker", async () => {
+      await renderApp({ pickResult: null });
+      await userEvent.click(screen.getByRole("button", { name: "Add project" }));
+      const dialog = screen.getByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: /choose/i }));
+      expect(within(dialog).getByText(/no folder chosen/i)).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    });
+  });
+
+  describe("deleting a project", () => {
+    it("asks for confirmation, then removes it and returns to the Inbox", async () => {
+      const { calls } = await renderApp();
+      await userEvent.click(projectButton("reports"));
+      await userEvent.click(screen.getByRole("button", { name: "Actions for reports" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+      const dialog = screen.getByRole("dialog", { name: /delete project/i });
+      expect(dialog).toHaveTextContent("reports");
+      expect(dialog).toHaveTextContent(/files on disk are not touched/i);
+      await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls.find((c) => c.method === "removeProject")?.args).toEqual([1]);
+      expect(within(projectList()).queryByRole("button", { name: /^reports/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /inbox/i })).toHaveAttribute("aria-current", "page");
+    });
+
+    it("does nothing when the confirmation is cancelled", async () => {
+      const { calls } = await renderApp();
+      await userEvent.click(screen.getByRole("button", { name: "Actions for agent" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+      await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+      expect(calls.some((c) => c.method === "removeProject")).toBe(false);
+      expect(projectButton("agent")).toBeInTheDocument();
+    });
+
+    it("closes the menu on Escape and on an outside click", async () => {
+      await renderApp();
+      const button = screen.getByRole("button", { name: "Actions for agent" });
+      await userEvent.click(button);
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(button).toHaveFocus();
+
+      await userEvent.click(button);
+      await userEvent.click(document.body);
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows an unavailable project with a warning and an error in the center bar", async () => {
+    await renderApp(undefined, {
+      projects: [{ name: "gone", path: "/mock/gone", files: {}, available: false }],
+    });
+    expect(within(projectList()).getByRole("img", { name: /folder not found/i })).toBeInTheDocument();
+    await userEvent.click(projectButton("gone"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/folder not found/i);
+  });
+
+  it("reports a failure to load projects", async () => {
+    const api = createMockApi(seed());
+    api.listProjects = () => Promise.reject(Object.assign(new Error("db"), { kind: "Storage" }));
     renderWithApi(<App />, api);
-    await userEvent.click(screen.getByRole("button", { name: /open folder/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/could not open/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load projects/i);
   });
 });

@@ -4,6 +4,7 @@ import type { TreeEntry } from "../api/types";
 import { messageFor } from "./errors";
 
 type TreeProps = {
+  projectId: number;
   selected: string | null;
   onSelect: (relPath: string) => void;
 };
@@ -13,26 +14,32 @@ type Listing =
   | { status: "ok"; entries: TreeEntry[] }
   | { status: "error"; error: unknown };
 
-/** Sidebar tree of the current root. Each directory level is fetched on demand. */
+/** Folder tree of a project. Each directory level is fetched on demand. */
 export function Tree(props: TreeProps) {
   return <DirChildren rel="" depth={0} {...props} />;
 }
 
-function DirChildren({ rel, depth, selected, onSelect }: TreeProps & { rel: string; depth: number }) {
+function DirChildren({
+  projectId,
+  rel,
+  depth,
+  selected,
+  onSelect,
+}: TreeProps & { rel: string; depth: number }) {
   const api = useApi();
   const [listing, setListing] = useState<Listing>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     setListing({ status: "loading" });
-    api.listDir(rel).then(
+    api.listDir(projectId, rel).then(
       (entries) => !cancelled && setListing({ status: "ok", entries }),
       (error: unknown) => !cancelled && setListing({ status: "error", error }),
     );
     return () => {
       cancelled = true;
     };
-  }, [api, rel]);
+  }, [api, projectId, rel]);
 
   const isRoot = rel === "";
 
@@ -51,7 +58,14 @@ function DirChildren({ rel, depth, selected, onSelect }: TreeProps & { rel: stri
   }
 
   const items = listing.entries.map((entry) => (
-    <TreeNode key={entry.relPath} entry={entry} depth={depth} selected={selected} onSelect={onSelect} />
+    <TreeNode
+      key={entry.relPath}
+      projectId={projectId}
+      entry={entry}
+      depth={depth}
+      selected={selected}
+      onSelect={onSelect}
+    />
   ));
   return isRoot ? (
     <ul className="tree" role="tree" aria-label="Files">
@@ -65,6 +79,7 @@ function DirChildren({ rel, depth, selected, onSelect }: TreeProps & { rel: stri
 }
 
 function TreeNode({
+  projectId,
   entry,
   depth,
   selected,
@@ -101,7 +116,13 @@ function TreeNode({
         <span className="tree-label">{entry.name}</span>
       </div>
       {isDir && expanded && (
-        <DirChildren rel={entry.relPath} depth={depth + 1} selected={selected} onSelect={onSelect} />
+        <DirChildren
+          projectId={projectId}
+          rel={entry.relPath}
+          depth={depth + 1}
+          selected={selected}
+          onSelect={onSelect}
+        />
       )}
     </li>
   );
