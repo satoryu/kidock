@@ -8,6 +8,7 @@ import {
   type InboxCounts,
   type InboxItem,
   type KidockApi,
+  type OpenRequest,
   type ProjectInfo,
   type TreeEntry,
 } from "./types";
@@ -29,6 +30,25 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set<ErrorKind>([
 
 /** Backend event carrying `FileChange[]` batches. */
 export const CHANGES_EVENT = "kidock://changes";
+/** Backend event carrying an `OpenRequest` after a notification click. */
+export const OPEN_EVENT = "kidock://open";
+
+/**
+ * Subscribes to a backend event. `listen` resolves asynchronously, so an
+ * unsubscribe before it resolves must still detach the listener once it exists.
+ */
+function subscribe<T>(event: string, handler: (payload: T) => void): () => void {
+  let unlisten: (() => void) | undefined;
+  let active = true;
+  void listen<T>(event, (e) => handler(e.payload)).then((fn) => {
+    if (active) unlisten = fn;
+    else fn();
+  });
+  return () => {
+    active = false;
+    unlisten?.();
+  };
+}
 
 /** Normalizes whatever `invoke` rejected with into a `KidockError`. */
 export function toKidockError(e: unknown): KidockError {
@@ -66,18 +86,10 @@ export const tauriApi: KidockApi = {
   inboxCounts: () => call<InboxCounts>("inbox_counts"),
   markRead: (projectId, relPath) => call<boolean>("mark_read", { projectId, rel: relPath }),
   markAllRead: () => call<number>("mark_all_read"),
-  onChanges(handler) {
-    // `listen` resolves asynchronously; unsubscribing before it resolves
-    // must still detach the listener once it exists.
-    let unlisten: (() => void) | undefined;
-    let active = true;
-    void listen<FileChange[]>(CHANGES_EVENT, (e) => handler(e.payload)).then((fn) => {
-      if (active) unlisten = fn;
-      else fn();
-    });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+  getNotificationsEnabled: () => call<boolean>("get_notifications_enabled"),
+  setNotificationsEnabled: async (enabled) => {
+    await call<null>("set_notifications_enabled", { enabled });
   },
+  onOpenRequest: (handler) => subscribe<OpenRequest>(OPEN_EVENT, handler),
+  onChanges: (handler) => subscribe<FileChange[]>(CHANGES_EVENT, handler),
 };

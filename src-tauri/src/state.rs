@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::domain::{DomainError, ExclusionRules, Project, ProjectId, RootFolder};
@@ -20,8 +21,13 @@ pub struct AppState {
     projects: RwLock<BTreeMap<ProjectId, Project>>,
     /// Set once the detector thread runs (absent in unit tests).
     watchers: Mutex<Option<Watchers>>,
+    /// Cached `notifications.enabled` setting (read on every notification).
+    notifications_enabled: AtomicBool,
     pub rules: ExclusionRules,
 }
+
+/// Settings key for the OS-notification toggle ("1" / "0"; absent = on).
+pub const NOTIFICATIONS_ENABLED: &str = "notifications.enabled";
 
 impl AppState {
     /// Loads every stored project. A folder that no longer resolves to a
@@ -44,12 +50,26 @@ impl AppState {
                 (row.id, project)
             })
             .collect();
+        let notifications_enabled =
+            store.get_setting(NOTIFICATIONS_ENABLED)?.as_deref() != Some("0");
         Ok(Self {
             store: Mutex::new(store),
             projects: RwLock::new(projects),
             watchers: Mutex::new(None),
+            notifications_enabled: AtomicBool::new(notifications_enabled),
             rules: ExclusionRules::default(),
         })
+    }
+
+    pub fn notifications_enabled(&self) -> bool {
+        self.notifications_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_notifications_enabled(&self, enabled: bool) -> Result<(), DomainError> {
+        self.store()
+            .set_setting(NOTIFICATIONS_ENABLED, if enabled { "1" } else { "0" })?;
+        self.notifications_enabled.store(enabled, Ordering::Relaxed);
+        Ok(())
     }
 
     pub fn set_watchers(&self, watchers: Watchers) {
@@ -103,6 +123,19 @@ impl AppState {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn notifications_toggle_defaults_on_and_persists() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("kidock.db");
+        let state = AppState::load(Store::open(&db).unwrap()).unwrap();
+        assert!(state.notifications_enabled());
+        state.set_notifications_enabled(false).unwrap();
+        assert!(!state.notifications_enabled());
+        drop(state);
+        let reloaded = AppState::load(Store::open(&db).unwrap()).unwrap();
+        assert!(!reloaded.notifications_enabled());
+    }
 
     #[test]
     fn load_marks_missing_folders_unavailable() {

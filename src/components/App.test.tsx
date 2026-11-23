@@ -290,6 +290,43 @@ describe("App", () => {
     });
   });
 
+  describe("OS notifications", () => {
+    it("toggles notifications and persists the choice", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      const toggle = await screen.findByRole("button", { name: /notifications on/i });
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+      await userEvent.click(toggle);
+      expect(screen.getByRole("button", { name: /notifications off/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      expect(await api.getNotificationsEnabled()).toBe(false);
+    });
+
+    it("opens the file of a clicked notification and marks it read", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      act(() => api.emitChanges([{ projectId: 2, relPath: "README.md", kind: "updated" }]));
+      await userEvent.click(projectButton("reports"));
+
+      act(() => api.emitOpenRequest({ projectId: 2, relPath: "README.md" }));
+      expect(await screen.findByRole("heading", { name: "Agent" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Inbox/ })).toHaveAttribute("aria-current", "page");
+      await waitFor(async () => expect((await api.inboxCounts()).total).toBe(0));
+    });
+
+    it("shows the Inbox for a summary notification", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      await userEvent.click(projectButton("reports"));
+      act(() => api.emitOpenRequest({ projectId: null, relPath: null }));
+      expect(screen.getByRole("button", { name: /^Inbox/ })).toHaveAttribute("aria-current", "page");
+    });
+  });
+
   it("shows an unavailable project with a warning and an error in the center bar", async () => {
     await renderApp(undefined, {
       projects: [{ name: "gone", path: "/mock/gone", files: {}, available: false }],

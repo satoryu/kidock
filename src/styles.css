@@ -659,3 +659,41 @@ button {
 .inbox-item.is-unread .inbox-time {
   color: var(--fg);
 }
+
+/* ---- Sidebar footer ---- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 8px 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.footer-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 0.85em;
+  color: var(--muted);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.footer-toggle:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.footer-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

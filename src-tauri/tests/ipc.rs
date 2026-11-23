@@ -112,6 +112,24 @@ fn project_lifecycle_over_ipc() {
     );
     assert_eq!(invoke(&webview, "mark_all_read", json!({})), Ok(json!(0)));
 
+    // Notification toggle.
+    assert_eq!(
+        invoke(&webview, "get_notifications_enabled", json!({})),
+        Ok(json!(true))
+    );
+    assert_eq!(
+        invoke(
+            &webview,
+            "set_notifications_enabled",
+            json!({ "enabled": false })
+        ),
+        Ok(Value::Null)
+    );
+    assert_eq!(
+        invoke(&webview, "get_notifications_enabled", json!({})),
+        Ok(json!(false))
+    );
+
     let err = invoke(
         &webview,
         "add_project",

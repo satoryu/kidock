@@ -3,6 +3,8 @@
 pub mod asset_scope;
 pub mod detector;
 pub mod fs_reader;
+pub mod notifier;
+pub mod os_notify;
 pub mod scan;
 pub mod sink;
 pub mod store;

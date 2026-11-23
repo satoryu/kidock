@@ -6,7 +6,9 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
 
 use crate::domain::ProjectChange;
+use crate::domain::notice::NoticeItem;
 use crate::infra::detector::ChangeSink;
+use crate::infra::notifier::NotifierHandle;
 use crate::infra::store::now_millis;
 use crate::state::AppState;
 
@@ -37,12 +39,33 @@ pub struct AppSink<R: Runtime> {
     /// Weak: the state owns the watchers, which feed the detector holding this sink.
     state: Weak<AppState>,
     app: AppHandle<R>,
+    notifier: Option<NotifierHandle>,
 }
 
 impl<R: Runtime> AppSink<R> {
-    pub fn new(state: Weak<AppState>, app: AppHandle<R>) -> Self {
-        Self { state, app }
+    pub fn new(state: Weak<AppState>, app: AppHandle<R>, notifier: Option<NotifierHandle>) -> Self {
+        Self {
+            state,
+            app,
+            notifier,
+        }
     }
+}
+
+/// Changes as notification items, with project names from the cache.
+pub fn notice_items(state: &AppState, changes: &[ProjectChange]) -> Vec<NoticeItem> {
+    changes
+        .iter()
+        .filter_map(|c| {
+            let project = state.project(c.project).ok()?;
+            Some(NoticeItem {
+                project: c.project,
+                project_name: project.name,
+                rel: c.rel.clone(),
+                kind: c.kind,
+            })
+        })
+        .collect()
 }
 
 /// Records `changes` in the Inbox (shared by `AppSink` and tests).
@@ -56,6 +79,9 @@ impl<R: Runtime> ChangeSink for AppSink<R> {
     fn deliver(&self, changes: &[ProjectChange]) {
         if let Some(state) = self.state.upgrade() {
             record_in_inbox(&state, changes);
+            if let Some(n) = &self.notifier {
+                n.notify(notice_items(&state, changes));
+            }
         }
         // Emit even if recording failed, so the tree still refreshes.
         let payload: Vec<FileChangeDto> = changes.iter().map(FileChangeDto::from).collect();
