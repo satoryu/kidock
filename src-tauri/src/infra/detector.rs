@@ -146,6 +146,16 @@ impl Detector {
             // It may have been a directory that was removed or moved away.
             let prefix = format!("{}/", rel.to_wire());
             out.extend(known.keys().filter(|k| k.starts_with(&prefix)).cloned());
+            // Siblings: the debouncer rewrites queued events on rename, so a
+            // rename may arrive as only its new path. Re-checking the known
+            // files of the same folder catches the vanished old name.
+            let parent = parent_prefix(&rel);
+            out.extend(
+                known
+                    .keys()
+                    .filter(|k| k.starts_with(&parent) && !k[parent.len()..].contains('/'))
+                    .cloned(),
+            );
             // Or a directory that appeared (created or moved in).
             if scan::is_dir(&project.folder, &rel) {
                 out.extend(
@@ -170,6 +180,14 @@ impl Detector {
                 .map(|(r, _)| r.to_wire()),
         );
         out
+    }
+}
+
+/// `"a/b/"` for `a/b/c.md`, `""` for a top-level path.
+fn parent_prefix(rel: &RelPath) -> String {
+    match rel.components() {
+        [] | [_] => String::new(),
+        [dirs @ .., _] => format!("{}/", dirs.join("/")),
     }
 }
 
@@ -372,6 +390,22 @@ mod tests {
     }
 
     #[test]
+    fn a_rename_reported_only_by_its_new_path_still_deletes_the_old_one() {
+        // The debouncer rewrites queued events on rename, so the old path
+        // can be missing from the batch entirely.
+        let f = Fixture::new();
+        f.write("docs/old.md", "x");
+        f.write("docs/other.md", "y");
+        f.detector.handle(&Msg::Baseline(f.id)).unwrap();
+        fs::rename(f.path("docs/old.md"), f.path("docs/renamed.md")).unwrap();
+        f.paths(&["docs/renamed.md"]);
+        assert_eq!(
+            f.sink.take(),
+            batch(&[("docs/old.md", Deleted), ("docs/renamed.md", Created)])
+        );
+    }
+
+    #[test]
     fn excluded_and_non_markdown_paths_are_ignored() {
         let f = Fixture::new();
         f.detector.handle(&Msg::Baseline(f.id)).unwrap();
@@ -456,6 +490,12 @@ mod tests {
 
         f.detector.handle(&Msg::Rescan(ProjectId(999))).unwrap();
         assert!(f.sink.take().is_empty());
+    }
+
+    #[test]
+    fn parent_prefix_of_nested_and_top_level_paths() {
+        assert_eq!(parent_prefix(&RelPath::parse("a/b/c.md").unwrap()), "a/b/");
+        assert_eq!(parent_prefix(&RelPath::parse("c.md").unwrap()), "");
     }
 
     #[test]
