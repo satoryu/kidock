@@ -2,10 +2,10 @@
 
 ## 1. Rust
 
-- [ ] 1.1 `percent_decode` (valid, `%2F`, invalid escapes, invalid UTF-8).
-- [ ] 1.2 `asset_protocol::serve` (ok, unknown project, escape via `..`, escape via symlink, disallowed extension, missing) + scheme registration.
-- [ ] 1.3 `open_external` (http/https only) + opener plugin (no WebView capability).
-- [ ] 1.4 CSP and config: `kidock-asset` origins in; asset protocol out. IPC test.
+- [x] 1.1 `percent_decode` (valid, `%2F`, invalid escapes, invalid UTF-8).
+- [x] 1.2 `asset_protocol::serve` (ok, unknown project, escape via `..`, escape via symlink, disallowed extension, missing) + scheme registration.
+- [x] 1.3 `open_external` (http/https only) + opener plugin (no WebView capability).
+- [x] 1.4 CSP and config: `kidock-asset` origins in; asset protocol out. IPC test.
 
 ## 2. Frontend
 

@@ -15,11 +15,12 @@ use tauri::{AppHandle, Runtime, State};
 
 pub use error::CommandError;
 
+use crate::domain::percent::is_external_url;
 use crate::domain::{
     DomainError, EntryKind, Project, ProjectId, RelPath, TreeEntry, check_overlap, project_name,
 };
+use crate::infra::fs_reader;
 use crate::infra::store::{InboxRow, UnreadCounts};
-use crate::infra::{asset_scope, fs_reader};
 use crate::state::AppState;
 
 /// How many Inbox items are listed (older ones are kept and counted).
@@ -249,14 +250,12 @@ pub fn list_projects(state: State<'_, Arc<AppState>>) -> Vec<ProjectInfo> {
 }
 
 #[tauri::command(async)]
-pub fn add_project<R: Runtime>(
-    app: AppHandle<R>,
+pub fn add_project(
     state: State<'_, Arc<AppState>>,
     name: Option<String>,
     path: String,
 ) -> Result<ProjectInfo, CommandError> {
     let project = do_add_project(&state, name.as_deref(), Path::new(&path))?;
-    asset_scope::allow_root(&app, &project.folder)?;
     Ok(ProjectInfo::from(&project))
 }
 
@@ -265,9 +264,20 @@ pub fn remove_project(
     state: State<'_, Arc<AppState>>,
     project_id: i64,
 ) -> Result<(), CommandError> {
-    // The asset-protocol scope cannot be revoked at runtime; Kidock's own
-    // commands reject the id from now on, and the scope resets on restart.
     do_remove_project(&state, ProjectId(project_id))
+}
+
+/// Opens an `http(s)` link in the OS browser. The WebView has no opener
+/// permission of its own; this is the only way out, and it refuses other schemes.
+#[tauri::command(async)]
+pub fn open_external<R: Runtime>(app: AppHandle<R>, url: String) -> Result<(), CommandError> {
+    use tauri_plugin_opener::OpenerExt;
+    if !is_external_url(&url) {
+        return Err(DomainError::InvalidPath("only http(s) links can be opened".into()).into());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| DomainError::Io(format!("failed to open the link: {e}")).into())
 }
 
 #[tauri::command(async)]

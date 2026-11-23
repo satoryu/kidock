@@ -7,6 +7,7 @@ pub mod filter;
 pub mod hash;
 pub mod inbox;
 pub mod notice;
+pub mod percent;
 pub mod project;
 pub mod rel_path;
 pub mod root;
