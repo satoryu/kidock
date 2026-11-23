@@ -43,6 +43,11 @@ const MIGRATIONS: &[&str] = &[
      );
      CREATE INDEX inbox_by_time ON inbox_items (changed_at DESC);
      CREATE INDEX inbox_by_unread ON inbox_items (read, project_id);",
+    // v4 (#8): app settings as key/value strings.
+    "CREATE TABLE settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+     );",
 ];
 
 /// An Inbox item as listed for the UI.
@@ -391,6 +396,28 @@ impl Store {
     }
 }
 
+impl Store {
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>, DomainError> {
+        self.conn
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+                r.get(0)
+            })
+            .optional()
+            .map_err(storage)
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<(), DomainError> {
+        self.conn
+            .execute(
+                "INSERT INTO settings (key, value) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+            .map(|_| ())
+            .map_err(storage)
+    }
+}
+
 pub(crate) fn now_millis() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -641,6 +668,15 @@ mod tests {
         store.delete_project(p).unwrap();
         assert!(store.list_inbox(10).unwrap().is_empty());
         assert_eq!(store.unread_counts().unwrap().total, 0);
+    }
+
+    #[test]
+    fn stores_settings() {
+        let store = Store::open_in_memory().unwrap();
+        assert_eq!(store.get_setting("k").unwrap(), None);
+        store.set_setting("k", "1").unwrap();
+        store.set_setting("k", "0").unwrap();
+        assert_eq!(store.get_setting("k").unwrap().as_deref(), Some("0"));
     }
 
     #[test]

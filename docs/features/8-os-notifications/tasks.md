@@ -4,11 +4,11 @@ Complete in order, with TDD for logic.
 
 ## 1. Backend
 
-- [ ] 1.1 `domain::notice` — `dedupe`, `summarize` (one file, nested folder, several in one project, several projects, more than 3 names, deletions only).
-- [ ] 1.2 Store migration v4 (`settings`) and get/set.
-- [ ] 1.3 `Notifier` thread with coalescing window and `Presenter` trait (fake presenter tests: one window → one notice; disabled/focused → none).
-- [ ] 1.4 `TauriPresenter` (plugin, focus check, settings, id → target, tap → focus + `kidock://open`); `AppSink` forwards batches; setup wiring; plugin added.
-- [ ] 1.5 Commands `get/set_notifications_enabled` + IPC test.
+- [x] 1.1 `domain::notice` — `dedupe`, `summarize` (one file, nested folder, several in one project, several projects, more than 3 names, deletions only).
+- [x] 1.2 Store migration v4 (`settings`) and get/set.
+- [x] 1.3 `Notifier` thread with coalescing window and `Presenter` trait (fake presenter tests: one window → one notice; disabled/focused → none).
+- [x] 1.4 `TauriPresenter` (plugin, focus check, settings, id → target, tap → focus + `kidock://open`); `AppSink` forwards batches; setup wiring; plugin added.
+- [x] 1.5 Commands `get/set_notifications_enabled` + IPC test.
 
 ## 2. Frontend
 

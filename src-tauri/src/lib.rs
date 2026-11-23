@@ -13,8 +13,10 @@ use std::sync::Arc;
 use tauri::{Builder, Manager, Runtime};
 
 use infra::detector::{Detector, Msg};
+use infra::os_notify::TauriPresenter;
 use infra::sink::AppSink;
 use infra::watcher::{DEBOUNCE, Watchers};
+use tauri_plugin_notification::NotificationExt;
 
 /// File name of the SQLite database inside the app data directory.
 const DB_FILE: &str = "kidock.db";
@@ -31,6 +33,8 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::inbox_counts,
         commands::mark_read,
         commands::mark_all_read,
+        commands::get_notifications_enabled,
+        commands::set_notifications_enabled,
     ])
 }
 
@@ -38,13 +42,31 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let store = infra::store::Store::open(&dir.join(DB_FILE))?;
             let state = Arc::new(state::AppState::load(store)?);
 
-            let sink = Arc::new(AppSink::new(Arc::downgrade(&state), app.handle().clone()));
+            let presenter = Arc::new(TauriPresenter::new(
+                app.handle().clone(),
+                Arc::downgrade(&state),
+            ));
+            let tapped = presenter.clone();
+            app.notification().on_action(move |action| {
+                if action.action_id() == "tap"
+                    && let Some(n) = action.notification()
+                {
+                    tapped.on_tap(n.id());
+                }
+            })?;
+            let notifier = infra::notifier::spawn(presenter, infra::notifier::WINDOW);
+            let sink = Arc::new(AppSink::new(
+                Arc::downgrade(&state),
+                app.handle().clone(),
+                Some(notifier),
+            ));
             let mut watchers = Watchers::new(Detector::new(state.clone(), sink).spawn(), DEBOUNCE);
             let available: Vec<_> = state
                 .projects_read()

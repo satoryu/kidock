@@ -226,6 +226,10 @@ pub fn do_mark_all_read(state: &AppState) -> Result<usize, CommandError> {
     Ok(state.store().mark_all_read()?)
 }
 
+pub fn do_set_notifications_enabled(state: &AppState, enabled: bool) -> Result<(), CommandError> {
+    Ok(state.set_notifications_enabled(enabled)?)
+}
+
 fn project_and_rel(
     state: &AppState,
     id: ProjectId,
@@ -306,6 +310,19 @@ pub fn mark_read(
 #[tauri::command(async)]
 pub fn mark_all_read(state: State<'_, Arc<AppState>>) -> Result<usize, CommandError> {
     do_mark_all_read(&state)
+}
+
+#[tauri::command(async)]
+pub fn get_notifications_enabled(state: State<'_, Arc<AppState>>) -> bool {
+    state.notifications_enabled()
+}
+
+#[tauri::command(async)]
+pub fn set_notifications_enabled(
+    state: State<'_, Arc<AppState>>,
+    enabled: bool,
+) -> Result<(), CommandError> {
+    do_set_notifications_enabled(&state, enabled)
 }
 
 #[cfg(test)]
