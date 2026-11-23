@@ -1,5 +1,9 @@
 //! Thin Tauri command handlers. Each `#[tauri::command]` delegates to a plain
 //! function that takes `&AppState`, so the wiring is testable without a runtime.
+//!
+//! Commands are declared `#[tauri::command(async)]` so they run on Tauri's
+//! thread pool: plain sync commands run on the main thread, where slow I/O
+//! (huge directories, network drives) would freeze the UI.
 
 mod error;
 
@@ -76,7 +80,7 @@ fn root_and_rel(state: &AppState, rel: &str) -> Result<(RootFolder, RelPath), Do
     Ok((root, RelPath::parse(rel)?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_root<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
@@ -87,7 +91,7 @@ pub fn set_root<R: Runtime>(
     Ok(RootInfo::from(&root))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_dir(
     state: State<'_, AppState>,
     rel: String,
@@ -95,7 +99,7 @@ pub fn list_dir(
     do_list_dir(&state, &rel)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_markdown(state: State<'_, AppState>, rel: String) -> Result<String, CommandError> {
     do_read_markdown(&state, &rel)
 }

@@ -196,4 +196,5 @@ Merging is not the end of the work. An Issue/PR is done only when all of the fol
 - **Relative paths resolve against the `.md` file's directory**, not the registered folder root or the app's CWD. Reject resolved paths that escape the registered folders.
 - **Path comparison**: normalize separators and casing rules in one place; never compare raw path strings across the IPC boundary. Windows paths may also come with the `\\?\` prefix after canonicalization.
 - **Large trees**: do not send the full recursive tree over IPC in one payload; load children lazily.
+- **Sync Tauri commands run on the main thread**: a plain `#[tauri::command] fn` blocks the UI while it does I/O. Declare I/O commands as `#[tauri::command(async)]` (runs a sync fn on the thread pool) or as `async fn` (verified in tauri-macros 2.7 `command/wrapper.rs`).
 - **Do not use `git add -A`** (or `git add --all` / `git add .`): always stage explicit paths. TODO: enforce with a PreToolUse hook in `.claude/settings.json` (planned in a later Issue).
