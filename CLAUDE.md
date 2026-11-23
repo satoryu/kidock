@@ -121,9 +121,12 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 npm test            # run the whole suite once
 npm run test:watch  # watch mode
 npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
+npx vitest run --project scripts   # repository tooling only (hooks, CI helpers)
 ```
 
 IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`.
+
+Vitest has two projects (`vite.config.ts`): `web` (jsdom, `src/**/*.test.{ts,tsx}`) and `scripts` (Node, `scripts/**/*.test.mjs` and `.claude/**/*.test.mjs`). Repository tooling is written as Node ESM scripts so it runs on Windows without Git Bash; keep the logic in pure functions under `scripts/lib/` and test those.
 
 ## Branching Strategy
 
@@ -176,8 +179,20 @@ Do not merge a PR if there are unchecked items in its Test Plan. For items that 
 
 Merging is not the end of the work. An Issue/PR is done only when all of the following hold:
 
-1. CI is green on **both Windows and macOS**, and the merge is chained to it (never merge as a separate step that ignores the CI result). TODO: add the exact watch-and-merge command once CI exists (CI itself is set up in a later Issue).
-2. After merging, watch the CI run on `main` (`gh run watch`) until it completes green.
+1. CI (`.github/workflows/ci.yml`) is green on **both Windows and macOS**, and the merge is chained to it. Never merge as a separate step that ignores the CI result:
+
+   ```bash
+   node scripts/watch-pr.mjs <PR> && gh pr merge <PR> --squash --delete-branch
+   ```
+
+   `watch-pr.mjs` exits 0 only when every check passed and both `check (macos-latest)` and `check (windows-latest)` ran. It exits non-zero on failure, cancellation, missing jobs, or no checks. If the workflow's job names change, update `REQUIRED_CHECKS` in `scripts/lib/checks.mjs` (or pass `--require <name>`).
+2. After merging, watch the CI run on `main` until it completes green:
+
+   ```bash
+   git fetch origin main
+   gh run watch "$(gh run list --branch main --commit "$(git rev-parse origin/main)" --workflow CI --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status
+   ```
+
 3. Record the verification results on the PR / Issue before closing it.
 
 ## Verification Principles
@@ -197,4 +212,4 @@ Merging is not the end of the work. An Issue/PR is done only when all of the fol
 - **Path comparison**: normalize separators and casing rules in one place; never compare raw path strings across the IPC boundary. Windows paths may also come with the `\\?\` prefix after canonicalization.
 - **Large trees**: do not send the full recursive tree over IPC in one payload; load children lazily.
 - **Sync Tauri commands run on the main thread**: a plain `#[tauri::command] fn` blocks the UI while it does I/O. Declare I/O commands as `#[tauri::command(async)]` (runs a sync fn on the thread pool) or as `async fn` (verified in tauri-macros 2.7 `command/wrapper.rs`).
-- **Do not use `git add -A`** (or `git add --all` / `git add .`): always stage explicit paths. TODO: enforce with a PreToolUse hook in `.claude/settings.json` (planned in a later Issue).
+- **Do not use `git add -A`** (or `git add --all` / `git add .`): always stage explicit paths. Enforced by the PreToolUse hook in `.claude/settings.json` (`.claude/hooks/guard-git-add.mjs` → `scripts/lib/gitAddGuard.mjs`), which also blocks `-u`, `./`, `:/`, and `*`. It is a guardrail, not a sandbox: it does not see through `eval`, aliases, or `sh -c`, so don't try to work around it. If it blocks a legitimate command (a false positive), fix the guard with a test instead of rephrasing the command to slip past it.

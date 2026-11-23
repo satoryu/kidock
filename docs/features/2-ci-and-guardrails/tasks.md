@@ -12,7 +12,7 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 - [x] 2.2 Implement `scripts/lib/gitAddGuard.mjs` (tokenizer + matcher).
 - [x] 2.3 `.claude/hooks/guard-git-add.mjs` entry point (stdin JSON → exit 2 + stderr, or exit 0). Test it by spawning it with sample stdin.
 - [x] 2.4 `.claude/settings.json`: re-check the hook keys (`args`, `timeout`, `onFailure`) against the current hooks docs and the installed Claude Code version. Then add the hook. → Exec form (`command` + `args`) and `onFailure: "block"` per the hooks docs; installed Claude Code is 2.1.330 (≥ 2.1.295 needed for `onFailure`).
-- [ ] 2.5 Real check: in this session, `git add .` is blocked and `git add <path>` works (AC4).
+- [x] 2.5 Real check: in this session, `git add .` is blocked and `git add <path>` works (AC4). → After the settings reloaded: `git add .` was blocked with the reason on stderr, `git add README.md` ran. The hook also caught a false positive (a quoted heredoc PR body mentioning a bulk add); fixed with tests in 361beb7.
 
 ## 3. Watch-and-merge
 
@@ -29,6 +29,6 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 ## 5. Docs
 
-- [ ] 5.1 `CLAUDE.md`: replace the Definition of Done TODO with the watch-and-merge and watch-`main` commands. Replace the hook TODO with a reference to `.claude/settings.json` and its limits. Add `scripts/` to Testing if needed.
-- [ ] 5.2 README: CI badge.
+- [x] 5.1 `CLAUDE.md`: replace the Definition of Done TODO with the watch-and-merge and watch-`main` commands. Replace the hook TODO with a reference to `.claude/settings.json` and its limits. Add `scripts/` to Testing if needed.
+- [x] 5.2 README: CI badge.
 - [ ] 5.3 PR Test Plan (OS per item), self-review, fix findings. Merge with `watch-pr.mjs && gh pr merge`, then watch `main`.
