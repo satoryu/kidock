@@ -8,14 +8,25 @@ pub mod domain;
 pub mod infra;
 pub mod state;
 
-use tauri::Manager;
+use tauri::{Builder, Manager, Runtime};
 
 /// File name of the SQLite database inside the app data directory.
 const DB_FILE: &str = "kidock.db";
 
+/// Registers Kidock's IPC commands. Shared with the IPC-level tests.
+pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![
+        commands::list_projects,
+        commands::add_project,
+        commands::remove_project,
+        commands::list_dir,
+        commands::read_markdown,
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
@@ -27,14 +38,8 @@ pub fn run() {
             }
             app.manage(state);
             Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            commands::list_projects,
-            commands::add_project,
-            commands::remove_project,
-            commands::list_dir,
-            commands::read_markdown,
-        ])
+        });
+    with_commands(builder)
         .run(tauri::generate_context!())
         .expect("error while running Kidock");
 }

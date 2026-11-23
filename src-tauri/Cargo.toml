@@ -27,6 +27,8 @@ rusqlite = { version = "0.43", features = ["bundled"] }
 
 [dev-dependencies]
 tempfile = "3"
+# IPC-level tests (tests/ipc.rs) use `tauri::test` (mock runtime).
+tauri = { version = "2", features = ["protocol-asset", "test"] }
 
 # https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

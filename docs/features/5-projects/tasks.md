@@ -17,15 +17,15 @@ Complete in order, with TDD for logic.
 
 ## 3. Frontend
 
-- [ ] 3.1 API types, `tauriApi` (mockIPC tests for command names and args), `mockApi` with projects.
-- [ ] 3.2 `Modal`, `AddProjectDialog` (name fallback is server-side; disabled Add; errors stay in the dialog; Escape/Cancel).
-- [ ] 3.3 `Sidebar` + `ProjectMenu` + `ConfirmDeleteDialog`.
-- [ ] 3.4 `CenterBar` (Inbox placeholder, tree, unavailable state), plus `Tree`/`Viewer` with `projectId`.
-- [ ] 3.5 `App` wiring and the three-pane CSS.
+- [x] 3.1 API types, `tauriApi` (mockIPC tests for command names and args), `mockApi` with projects.
+- [x] 3.2 `Modal`, `AddProjectDialog` (name fallback is server-side; disabled Add; errors stay in the dialog; Escape/Cancel).
+- [x] 3.3 `Sidebar` + `ProjectMenu` + `ConfirmDeleteDialog`.
+- [x] 3.4 `CenterBar` (Inbox placeholder, tree, unavailable state), plus `Tree`/`Viewer` with `projectId`.
+- [x] 3.5 `App` wiring and the three-pane CSS.
 
 ## 4. Verification and docs
 
-- [ ] 4.1 All checks pass (cargo test/clippy/fmt, npm test/typecheck/build).
-- [ ] 4.2 Browser check with the mock API (headless Chrome): add, delete, tree, viewer, independent scrolling.
-- [ ] 4.3 Real app on macOS (`tauri dev`): add two projects, restart (state persists), delete one, check that the files are untouched.
+- [x] 4.1 All checks pass (cargo test/clippy/fmt, npm test/typecheck/build).
+- [x] 4.2 Browser check with the mock API (headless Chrome): add, delete, tree, viewer, independent scrolling.
+- [x] 4.3 Real app on macOS (`tauri dev`): add two projects, restart (state persists), delete one, check that the files are untouched. → Partially, without UI automation (computer-use is unavailable): `tauri dev` starts and creates `kidock.db` (schema v1, WAL). With an existing and a missing project seeded into the DB, the app restarts and stays up. Added `src-tauri/tests/ipc.rs`, which drives every command through Tauri's mock runtime with the frontend's JSON bodies. Clicking through the native window is left for the owner.
 - [ ] 4.4 Update `CLAUDE.md` (layering/state notes, DB location) if needed. PR, self-review, merge through the CI gate.

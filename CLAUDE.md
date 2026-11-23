@@ -104,7 +104,8 @@ This means you must write todos to complete the task first, then write a test th
   - `commands`: thin Tauri command / event handlers that wire `infra` to `domain`. Each `#[tauri::command]` delegates to a plain `do_*` function taking `&AppState`, so it is testable without a Tauri runtime.
   - Keep dependencies pointing inward: `commands` and `infra` may depend on `domain`, but `domain` must not depend on the outer layers.
 - **Frontend** (`src/`): all backend access goes through the `KidockApi` interface (`src/api/`), provided via React context (`ApiProvider` / `useApi`). `tauriApi` is the real implementation; `mockApi` is used in tests and in browser dev. Components never import `@tauri-apps/api` directly.
-- **Path rule**: the frontend sends an absolute path only once (to `set_root`, from the folder dialog). Every other request uses a `/`-separated path relative to the root, validated by `RelPath` and checked again after canonicalization.
+- **Path rule**: the frontend sends an absolute path only when registering a project (`add_project`, from the folder dialog). Every other request uses `(projectId, rel)`, where `rel` is a `/`-separated path relative to the project folder, validated by `RelPath` and checked again after canonicalization.
+- **Persistence**: SQLite (`rusqlite`, bundled) at `<app data dir>/kidock.db`, e.g. `~/Library/Application Support/io.github.satoryu.kidock/` on macOS and `%APPDATA%\io.github.satoryu.kidock\` on Windows. `infra::store` owns the schema. Add a new entry to `MIGRATIONS` for every schema change; never edit a released migration. `AppState` caches projects; writers take the `projects` lock before the store lock.
 
 ## Testing
 
@@ -124,7 +125,7 @@ npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
 npx vitest run --project scripts   # repository tooling only (hooks, CI helpers)
 ```
 
-IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`.
+IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`. On the Rust side, `src-tauri/tests/ipc.rs` invokes commands through Tauri's mock runtime with the same JSON bodies the frontend sends (camelCase argument names). Extend it whenever a command's signature changes, so `tauriApi.ts` and the Rust commands cannot drift apart.
 
 Vitest has two projects (`vite.config.ts`): `web` (jsdom, `src/**/*.test.{ts,tsx}`) and `scripts` (Node, `scripts/**/*.test.mjs` and `.claude/**/*.test.mjs`). Repository tooling is written as Node ESM scripts so it runs on Windows without Git Bash; keep the logic in pure functions under `scripts/lib/` and test those.
 
