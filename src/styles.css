@@ -53,9 +53,17 @@ body,
   margin: 0;
 }
 
+/* The window itself never scrolls; the sidebar tree and the viewer scroll
+   independently. */
+body {
+  overflow: hidden;
+}
+
 .app {
   display: grid;
   grid-template-columns: minmax(200px, 280px) 1fr;
+  /* minmax(0, …) stops the row from growing to fit its content. */
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -103,6 +111,7 @@ body,
 
 .sidebar-tree {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 4px 0;
 }
