@@ -1,10 +1,8 @@
 import type { ProjectInfo } from "../api/types";
-import type { View } from "./Sidebar";
 import { Tree } from "./Tree";
 
 type Props = {
-  view: View;
-  /** The selected project, when `view.kind === "project"`. */
+  /** The selected project. */
   project: ProjectInfo | undefined;
   selectedRel: string | null;
   onSelectFile: (relPath: string) => void;
@@ -12,19 +10,8 @@ type Props = {
   treeVersion: number;
 };
 
-/** Center bar: the Inbox list (#7) or the selected project's folder tree. */
-export function CenterBar({ view, project, selectedRel, onSelectFile, treeVersion }: Props) {
-  if (view.kind === "inbox") {
-    return (
-      <section className="center-bar" aria-label="Inbox">
-        <header className="pane-header">
-          <h2 className="pane-title">Inbox</h2>
-        </header>
-        <p className="pane-empty">No notifications yet.</p>
-      </section>
-    );
-  }
-
+/** Center bar for a project: its folder tree. (The Inbox has `InboxList`.) */
+export function CenterBar({ project, selectedRel, onSelectFile, treeVersion }: Props) {
   if (!project) return <section className="center-bar" aria-label="Project" />;
 
   return (

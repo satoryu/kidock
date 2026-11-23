@@ -11,10 +11,10 @@ Complete in order, with TDD for logic.
 
 ## 2. Frontend
 
-- [ ] 2.1 API (`tauriApi` + mock with the same rules).
-- [ ] 2.2 `formatRelative`.
-- [ ] 2.3 `InboxList` (items, kind icon, unread, selection, mark all as read, empty state).
-- [ ] 2.4 Sidebar badges; `App` wiring (refetch on changes, mark read on open from the Inbox or the tree, project removal).
+- [x] 2.1 API (`tauriApi` + mock with the same rules).
+- [x] 2.2 `formatRelative`.
+- [x] 2.3 `InboxList` (items, kind icon, unread, selection, mark all as read, empty state).
+- [x] 2.4 Sidebar badges; `App` wiring (refetch on changes, mark read on open from the Inbox or the tree, project removal).
 
 ## 3. Verification and docs
 

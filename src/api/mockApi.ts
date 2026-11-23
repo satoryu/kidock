@@ -1,6 +1,7 @@
 import {
   KidockError,
   type FileChange,
+  type InboxItem,
   type KidockApi,
   type ProjectInfo,
   type TreeEntry,
@@ -20,6 +21,8 @@ export type MockSeed = {
   projects?: MockProject[];
   /** Folders that can be added later via `addProject(name, path)`. */
   folders?: Record<string, Files>;
+  /** Initial Inbox items (project names are filled in). */
+  inbox?: Array<Omit<InboxItem, "projectName">>;
 };
 
 type MockOptions = {
@@ -33,8 +36,11 @@ const MAX_NAME_CHARS = 100;
 
 /** The mock adds test/dev controls on top of `KidockApi`. */
 export type MockApi = KidockApi & {
-  /** Simulates the backend detecting changes (also edits the in-memory files). */
-  emitChanges(changes: Array<FileChange & { content?: string }>): void;
+  /**
+   * Simulates the backend detecting changes: edits the in-memory files,
+   * records them in the Inbox (same rules as the backend), then notifies.
+   */
+  emitChanges(changes: Array<FileChange & { content?: string }>, nowMs?: number): void;
 };
 
 /**
@@ -60,6 +66,10 @@ export function createMockApi(
   }
 
   const listeners = new Set<(changes: FileChange[]) => void>();
+  type Item = Omit<InboxItem, "projectName">;
+  const inbox = new Map<string, Item>();
+  const key = (projectId: number, relPath: string) => `${projectId}\n${relPath}`;
+  for (const item of seed.inbox ?? []) inbox.set(key(item.projectId, item.relPath), { ...item });
   const wait = () => new Promise((r) => setTimeout(r, delayMs));
   const segments = (path: string) => path.toLowerCase().split(/[\\/]/).filter(Boolean);
   const startsWith = (a: string[], b: string[]) => b.every((s, i) => a[i] === s);
@@ -126,6 +136,49 @@ export function createMockApi(
       await wait();
       project(projectId);
       projects.delete(projectId);
+      for (const [k, item] of inbox) if (item.projectId === projectId) inbox.delete(k);
+    },
+
+    async listInbox() {
+      await wait();
+      return [...inbox.values()]
+        .filter((i) => projects.has(i.projectId))
+        .sort(
+          (a, b) =>
+            b.changedAt - a.changedAt ||
+            a.projectId - b.projectId ||
+            (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0),
+        )
+        .slice(0, 500)
+        .map((i) => ({ ...i, projectName: projects.get(i.projectId)!.info.name }));
+    },
+
+    async inboxCounts() {
+      await wait();
+      const by = new Map<number, number>();
+      for (const i of inbox.values()) if (!i.read) by.set(i.projectId, (by.get(i.projectId) ?? 0) + 1);
+      const byProject = [...by]
+        .sort(([a], [b]) => a - b)
+        .map(([projectId, unread]) => ({ projectId, unread }));
+      return { total: byProject.reduce((n, p) => n + p.unread, 0), byProject };
+    },
+
+    async markRead(projectId, relPath) {
+      await wait();
+      const item = inbox.get(key(projectId, relPath));
+      if (!item || item.read) return false;
+      item.read = true;
+      return true;
+    },
+
+    async markAllRead() {
+      await wait();
+      let n = 0;
+      for (const i of inbox.values()) if (!i.read) {
+        i.read = true;
+        n++;
+      }
+      return n;
     },
 
     async listDir(projectId, rel) {
@@ -155,12 +208,25 @@ export function createMockApi(
       return () => listeners.delete(handler);
     },
 
-    emitChanges(changes) {
+    emitChanges(changes, nowMs = Date.now()) {
       for (const { content, ...c } of changes) {
         const files = projects.get(c.projectId)?.files;
         if (!files) continue;
         if (c.kind === "deleted") delete files[c.relPath];
         else files[c.relPath] = content ?? files[c.relPath] ?? "";
+
+        // Inbox rules (see src-tauri/src/domain/inbox.rs).
+        const k = key(c.projectId, c.relPath);
+        const existing = inbox.get(k);
+        if (c.kind === "deleted") {
+          inbox.delete(k);
+          continue;
+        }
+        const kind =
+          c.kind === "updated" && existing && !existing.read && existing.kind === "created"
+            ? "created"
+            : c.kind;
+        inbox.set(k, { projectId: c.projectId, relPath: c.relPath, kind, changedAt: nowMs, read: false });
       }
       const batch = changes.map(({ projectId, relPath, kind }) => ({ projectId, relPath, kind }));
       for (const l of listeners) l(batch);

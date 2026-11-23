@@ -521,3 +521,141 @@ button {
   margin: 0 0.4em 0 -1.4em;
   vertical-align: middle;
 }
+
+/* ---- Badges ---- */
+.badge {
+  flex: none;
+  min-width: 18px;
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 9px;
+}
+
+/* ---- Inbox ---- */
+.pane-header-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.text-button {
+  flex: none;
+  padding: 2px 6px;
+  font-size: 0.85em;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.text-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.text-button:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.inbox-item:hover {
+  background: var(--hover);
+}
+
+.inbox-item.is-selected {
+  background: var(--selected);
+}
+
+.inbox-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.inbox-kind {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  font-size: 0.8em;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+}
+
+.inbox-kind.is-created {
+  color: #1a7f37;
+  background: rgb(26 127 55 / 0.12);
+}
+
+.inbox-kind.is-updated {
+  color: var(--accent);
+  background: rgb(9 105 218 / 0.12);
+}
+
+.inbox-main {
+  display: grid;
+  min-width: 0;
+}
+
+.inbox-name,
+.inbox-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-meta {
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+.inbox-item.is-unread .inbox-name {
+  font-weight: 600;
+}
+
+.unread-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.inbox-time {
+  font-size: 0.8em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.inbox-item.is-unread .inbox-time {
+  color: var(--fg);
+}

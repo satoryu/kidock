@@ -5,6 +5,8 @@ import {
   KidockError,
   type ErrorKind,
   type FileChange,
+  type InboxCounts,
+  type InboxItem,
   type KidockApi,
   type ProjectInfo,
   type TreeEntry,
@@ -60,6 +62,10 @@ export const tauriApi: KidockApi = {
   },
   listDir: (projectId, relPath) => call<TreeEntry[]>("list_dir", { projectId, rel: relPath }),
   readMarkdown: (projectId, relPath) => call<string>("read_markdown", { projectId, rel: relPath }),
+  listInbox: () => call<InboxItem[]>("list_inbox"),
+  inboxCounts: () => call<InboxCounts>("inbox_counts"),
+  markRead: (projectId, relPath) => call<boolean>("mark_read", { projectId, rel: relPath }),
+  markAllRead: () => call<number>("mark_all_read"),
   onChanges(handler) {
     // `listen` resolves asynchronously; unsubscribing before it resolves
     // must still detach the listener once it exists.

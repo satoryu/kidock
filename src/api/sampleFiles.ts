@@ -87,6 +87,13 @@ export const sampleSeed: MockSeed = {
     },
     { name: "Moved away", path: "/mock/missing", files: {}, available: false },
   ],
+  // Sample Inbox: ids follow the order of `projects` above (1, 2, ...).
+  inbox: [
+    { projectId: 2, relPath: "plan.md", kind: "created", changedAt: Date.now() - 2 * 60_000, read: false },
+    { projectId: 1, relPath: "code/samples.md", kind: "updated", changedAt: Date.now() - 50 * 60_000, read: false },
+    { projectId: 2, relPath: "logs/run-1.md", kind: "updated", changedAt: Date.now() - 5 * 3_600_000, read: true },
+    { projectId: 1, relPath: "README.md", kind: "created", changedAt: Date.now() - 30 * 3_600_000, read: true },
+  ],
   // `pickFolder()` returns "/mock/new-project" by default.
   folders: { "/mock/new-project": { "README.md": "# New project\n\nAdded from the dialog." } },
 };

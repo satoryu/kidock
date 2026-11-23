@@ -63,6 +63,26 @@ describe("tauriApi", () => {
     ]);
   });
 
+  it("calls the Inbox commands with the expected names and arguments", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return { list_inbox: [], inbox_counts: { total: 0, byProject: [] }, mark_read: true, mark_all_read: 3 }[
+        cmd
+      ];
+    });
+    await expect(tauriApi.listInbox()).resolves.toEqual([]);
+    await expect(tauriApi.inboxCounts()).resolves.toEqual({ total: 0, byProject: [] });
+    await expect(tauriApi.markRead(2, "docs/a.md")).resolves.toBe(true);
+    await expect(tauriApi.markAllRead()).resolves.toBe(3);
+    expect(calls).toEqual([
+      { cmd: "list_inbox", payload: {} },
+      { cmd: "inbox_counts", payload: {} },
+      { cmd: "mark_read", payload: { projectId: 2, rel: "docs/a.md" } },
+      { cmd: "mark_all_read", payload: {} },
+    ]);
+  });
+
   it("converts backend CommandError payloads into KidockError", async () => {
     mockIPC(() => {
       throw { kind: "OverlapsProject", message: "this folder is inside, or contains, another project" };
