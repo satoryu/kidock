@@ -367,6 +367,48 @@ describe("App", () => {
     await waitFor(async () => expect((await api.inboxCounts()).total).toBe(0));
   });
 
+  describe("exclusions", () => {
+    it("edits patterns and refreshes the open tree", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      await userEvent.click(projectButton("reports"));
+      expect(await screen.findByRole("treeitem", { name: "notes" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /exclusions/i }));
+      const dialog = screen.getByRole("dialog", { name: "Exclusions" });
+      const field = (await within(dialog).findByRole("textbox")) as HTMLTextAreaElement;
+      await waitFor(() => expect(field.value).toContain("node_modules"));
+      await userEvent.type(field, "\nnotes");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("treeitem", { name: "notes" })).not.toBeInTheDocument());
+      expect((await api.getExclusions()).patterns).toContain("notes");
+    });
+
+    it("shows validation errors and can reset to the defaults", async () => {
+      const api = createMockApi(seed());
+      await api.setExclusions(["custom"]);
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      await userEvent.click(screen.getByRole("button", { name: /exclusions/i }));
+      const dialog = screen.getByRole("dialog");
+      const field = (await within(dialog).findByRole("textbox")) as HTMLTextAreaElement;
+      await waitFor(() => expect(field.value).toBe("custom"));
+
+      await userEvent.clear(field);
+      await userEvent.type(field, "a/b");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(/cannot contain/i);
+
+      await userEvent.click(within(dialog).getByRole("button", { name: /reset to defaults/i }));
+      expect(field.value).toContain(".git");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(async () => expect((await api.getExclusions()).patterns).toContain(".git"));
+    });
+  });
+
   describe("OS notifications", () => {
     it("toggles notifications and persists the choice", async () => {
       const api = createMockApi(seed());

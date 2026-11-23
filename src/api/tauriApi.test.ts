@@ -143,6 +143,22 @@ describe("tauriApi links and assets", () => {
   });
 });
 
+describe("tauriApi exclusions", () => {
+  it("gets and sets patterns", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return cmd === "get_exclusions" ? { patterns: ["a"], defaults: [".git"] } : ["scratch"];
+    });
+    await expect(tauriApi.getExclusions()).resolves.toEqual({ patterns: ["a"], defaults: [".git"] });
+    await expect(tauriApi.setExclusions(["scratch", ""])).resolves.toEqual(["scratch"]);
+    expect(calls).toEqual([
+      { cmd: "get_exclusions", payload: {} },
+      { cmd: "set_exclusions", payload: { patterns: ["scratch", ""] } },
+    ]);
+  });
+});
+
 describe("tauriApi notifications", () => {
   it("gets and sets the toggle", async () => {
     const calls: Array<{ cmd: string; payload: unknown }> = [];

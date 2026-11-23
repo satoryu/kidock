@@ -94,6 +94,8 @@ export const tauriApi: KidockApi = {
   openExternal: async (url) => {
     await call<null>("open_external", { url });
   },
+  getExclusions: () => call<{ patterns: string[]; defaults: string[] }>("get_exclusions"),
+  setExclusions: (patterns) => call<string[]>("set_exclusions", { patterns }),
   getNotificationsEnabled: () => call<boolean>("get_notifications_enabled"),
   setNotificationsEnabled: async (enabled) => {
     await call<null>("set_notifications_enabled", { enabled });

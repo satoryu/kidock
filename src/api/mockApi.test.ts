@@ -127,6 +127,17 @@ describe("createMockApi", () => {
     expect(await api.listInbox()).toEqual([]);
   });
 
+  it("applies exclusion patterns to listings like the backend", async () => {
+    const api = createMockApi({
+      projects: [{ name: "p", path: "/mock/p", files: { "a.md": "a", "scratch/x.md": "x", ".notes/h.md": "h" } }],
+    });
+    expect((await api.listDir(1, "")).map((e) => e.name)).toEqual(["scratch", "a.md"]);
+    expect(await api.setExclusions([" scratch ", ""])).toEqual(["scratch"]);
+    expect((await api.listDir(1, "")).map((e) => e.name)).toEqual([".notes", "a.md"]);
+    await expect(api.setExclusions(["a/b"])).rejects.toMatchObject({ kind: "InvalidPath" });
+    expect((await api.getExclusions()).defaults).toContain("node_modules");
+  });
+
   it("returns the configured picker result", async () => {
     expect(await createMockApi({}, { pickResult: null }).pickFolder()).toBeNull();
     expect(await createMockApi({}, { pickResult: "/x" }).pickFolder()).toBe("/x");
