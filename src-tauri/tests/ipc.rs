@@ -96,6 +96,22 @@ fn project_lifecycle_over_ipc() {
         Ok(json!("# A"))
     );
 
+    // Inbox commands (empty, since no watcher runs in this test).
+    assert_eq!(invoke(&webview, "list_inbox", json!({})), Ok(json!([])));
+    assert_eq!(
+        invoke(&webview, "inbox_counts", json!({})),
+        Ok(json!({ "total": 0, "byProject": [] }))
+    );
+    assert_eq!(
+        invoke(
+            &webview,
+            "mark_read",
+            json!({ "projectId": id, "rel": "docs/a.md" })
+        ),
+        Ok(json!(false))
+    );
+    assert_eq!(invoke(&webview, "mark_all_read", json!({})), Ok(json!(0)));
+
     let err = invoke(
         &webview,
         "add_project",

@@ -5,6 +5,7 @@ pub mod entry;
 pub mod error;
 pub mod filter;
 pub mod hash;
+pub mod inbox;
 pub mod project;
 pub mod rel_path;
 pub mod root;

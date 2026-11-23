@@ -1,10 +1,11 @@
-import type { ProjectInfo } from "../api/types";
+import type { InboxCounts, ProjectInfo } from "../api/types";
 import { ProjectMenu } from "./ProjectMenu";
 
 export type View = { kind: "inbox" } | { kind: "project"; id: number };
 
 type Props = {
   projects: ProjectInfo[];
+  counts: InboxCounts;
   view: View;
   onSelectInbox: () => void;
   onSelectProject: (id: number) => void;
@@ -16,8 +17,18 @@ type Props = {
  * Left sidebar: Inbox entry and the Projects list. Each project row holds two
  * sibling buttons (select, and "⋯" actions) rather than nesting controls.
  */
+function Badge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="badge" aria-label={`${count} unread`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 export function Sidebar({
   projects,
+  counts,
   view,
   onSelectInbox,
   onSelectProject,
@@ -39,6 +50,7 @@ export function Sidebar({
             📥
           </span>
           <span className="nav-label">Inbox</span>
+          <Badge count={counts.total} />
         </button>
       </div>
 
@@ -75,6 +87,7 @@ export function Sidebar({
                       ⚠
                     </span>
                   )}
+                  <Badge count={counts.byProject.find((c) => c.projectId === p.id)?.unread ?? 0} />
                 </button>
                 <ProjectMenu projectName={p.name} onDelete={() => onDeleteProject(p)} />
               </li>

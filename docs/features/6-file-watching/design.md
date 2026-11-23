@@ -84,6 +84,7 @@ A single detector thread processes the queue serially, so no two reconciliations
     - the path itself, if tracked
     - all known files under it (it may have been a directory that was removed or moved away)
     - if it is now a directory, every tracked file under it from `walk`
+    - the known files in the same folder (siblings): `notify-debouncer-full` rewrites queued events on rename, so a rename can arrive as only its new path. This was found by the real-watcher test on macOS CI.
   - Each candidate goes through `observe` and then `decide`. Store ops are applied in one transaction, and the sink receives one batch.
   - **Baseline**: `walk` + `observe` for all files, upsert, `mark_baselined`. No changes are emitted.
   - **Rescan**: the union of the walk and the known files, with each reconciled as above, emitting the changes.

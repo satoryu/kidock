@@ -103,6 +103,30 @@ describe("createMockApi", () => {
     expect(seen).toHaveLength(2);
   });
 
+  it("keeps an Inbox with the backend's rules", async () => {
+    const api = seeded();
+    api.emitChanges([{ projectId: 1, relPath: "a.md", kind: "created" }], 10);
+    api.emitChanges([{ projectId: 1, relPath: "b.md", kind: "updated" }], 20);
+    api.emitChanges([{ projectId: 1, relPath: "a.md", kind: "updated" }], 30);
+    expect((await api.listInbox()).map((i) => [i.relPath, i.kind, i.changedAt, i.read])).toEqual([
+      ["a.md", "created", 30, false],
+      ["b.md", "updated", 20, false],
+    ]);
+    expect((await api.listInbox())[0].projectName).toBe("reports");
+    expect(await api.inboxCounts()).toEqual({ total: 2, byProject: [{ projectId: 1, unread: 2 }] });
+
+    expect(await api.markRead(1, "a.md")).toBe(true);
+    expect(await api.markRead(1, "a.md")).toBe(false);
+    api.emitChanges([{ projectId: 1, relPath: "b.md", kind: "deleted" }], 40);
+    expect(await api.inboxCounts()).toEqual({ total: 0, byProject: [] });
+    api.emitChanges([{ projectId: 1, relPath: "a.md", kind: "updated" }], 50);
+    expect((await api.listInbox())[0]).toMatchObject({ kind: "updated", read: false });
+    expect(await api.markAllRead()).toBe(1);
+
+    await api.removeProject(1);
+    expect(await api.listInbox()).toEqual([]);
+  });
+
   it("returns the configured picker result", async () => {
     expect(await createMockApi({}, { pickResult: null }).pickFolder()).toBeNull();
     expect(await createMockApi({}, { pickResult: "/x" }).pickFolder()).toBe("/x");

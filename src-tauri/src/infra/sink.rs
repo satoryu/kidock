@@ -1,10 +1,14 @@
-//! Delivering detected changes to the WebView.
+//! Delivering detected changes: record them in the Inbox, then tell the WebView.
+
+use std::sync::Weak;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
 
 use crate::domain::ProjectChange;
 use crate::infra::detector::ChangeSink;
+use crate::infra::store::now_millis;
+use crate::state::AppState;
 
 /// Event name the frontend listens to.
 pub const CHANGES_EVENT: &str = "kidock://changes";
@@ -27,19 +31,33 @@ impl From<&ProjectChange> for FileChangeDto {
     }
 }
 
-/// Emits each batch as one `kidock://changes` event.
-pub struct TauriSink<R: Runtime> {
+/// Records each batch in the Inbox, then emits it as one `kidock://changes`
+/// event. Writing first guarantees that the UI's refetch sees the new items.
+pub struct AppSink<R: Runtime> {
+    /// Weak: the state owns the watchers, which feed the detector holding this sink.
+    state: Weak<AppState>,
     app: AppHandle<R>,
 }
 
-impl<R: Runtime> TauriSink<R> {
-    pub fn new(app: AppHandle<R>) -> Self {
-        Self { app }
+impl<R: Runtime> AppSink<R> {
+    pub fn new(state: Weak<AppState>, app: AppHandle<R>) -> Self {
+        Self { state, app }
     }
 }
 
-impl<R: Runtime> ChangeSink for TauriSink<R> {
+/// Records `changes` in the Inbox (shared by `AppSink` and tests).
+pub fn record_in_inbox(state: &AppState, changes: &[ProjectChange]) {
+    if let Err(e) = state.store().record_changes(changes, now_millis()) {
+        eprintln!("kidock: failed to record changes in the Inbox: {e}");
+    }
+}
+
+impl<R: Runtime> ChangeSink for AppSink<R> {
     fn deliver(&self, changes: &[ProjectChange]) {
+        if let Some(state) = self.state.upgrade() {
+            record_in_inbox(&state, changes);
+        }
+        // Emit even if recording failed, so the tree still refreshes.
         let payload: Vec<FileChangeDto> = changes.iter().map(FileChangeDto::from).collect();
         if let Err(e) = self.app.emit(CHANGES_EVENT, payload) {
             eprintln!("kidock: failed to emit changes: {e}");

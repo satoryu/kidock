@@ -25,6 +25,21 @@ export type FileChange = {
   kind: ChangeKind;
 };
 
+export type InboxItem = {
+  projectId: number;
+  projectName: string;
+  relPath: string;
+  kind: "created" | "updated";
+  /** Milliseconds since the Unix epoch. */
+  changedAt: number;
+  read: boolean;
+};
+
+export type InboxCounts = {
+  total: number;
+  byProject: Array<{ projectId: number; unread: number }>;
+};
+
 /** Mirrors `CommandError.kind` on the Rust side, plus `Unknown` for unexpected failures. */
 export type ErrorKind =
   | "ProjectNotFound"
@@ -63,6 +78,12 @@ export interface KidockApi {
   removeProject(projectId: number): Promise<void>;
   listDir(projectId: number, relPath: string): Promise<TreeEntry[]>;
   readMarkdown(projectId: number, relPath: string): Promise<string>;
+  /** Newest Inbox items first (up to 500). */
+  listInbox(): Promise<InboxItem[]>;
+  inboxCounts(): Promise<InboxCounts>;
+  /** Marks a file's Inbox item read; resolves `false` if it had none or was read. */
+  markRead(projectId: number, relPath: string): Promise<boolean>;
+  markAllRead(): Promise<number>;
   /** Subscribes to batches of detected changes. Returns an unsubscribe function. */
   onChanges(handler: (changes: FileChange[]) => void): () => void;
 }

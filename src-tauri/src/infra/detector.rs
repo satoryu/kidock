@@ -474,6 +474,36 @@ mod tests {
         );
     }
 
+    /// The production recording path (minus the Tauri event).
+    struct InboxSink(Arc<AppState>);
+
+    impl ChangeSink for InboxSink {
+        fn deliver(&self, changes: &[ProjectChange]) {
+            crate::infra::sink::record_in_inbox(&self.0, changes);
+        }
+    }
+
+    #[test]
+    fn detected_changes_land_in_the_inbox_but_the_baseline_does_not() {
+        let f = Fixture::new();
+        f.write("existing.md", "x");
+        let detector = Detector::new(f.state.clone(), Arc::new(InboxSink(f.state.clone())));
+        detector.handle(&Msg::Baseline(f.id)).unwrap();
+        assert!(f.state.store().list_inbox(10).unwrap().is_empty());
+
+        f.write("new.md", "n");
+        detector
+            .handle(&Msg::Paths {
+                project: f.id,
+                paths: vec![f.path("new.md")],
+            })
+            .unwrap();
+        let items = f.state.store().list_inbox(10).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].rel_path, "new.md");
+        assert!(!items[0].read);
+    }
+
     #[test]
     fn paths_outside_the_project_and_removed_projects_are_ignored() {
         let f = Fixture::new();

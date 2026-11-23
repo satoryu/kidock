@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "../api/context";
-import type { ProjectInfo } from "../api/types";
+import type { InboxCounts, InboxItem, ProjectInfo } from "../api/types";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { CenterBar } from "./CenterBar";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { messageFor } from "./errors";
+import { InboxList } from "./InboxList";
 import { Sidebar, type View } from "./Sidebar";
 import { Viewer, type OpenFile } from "./Viewer";
 
@@ -19,20 +20,61 @@ export function App() {
   const [openFile, setOpenFile] = useState<OpenFile | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [treeVersion, setTreeVersion] = useState(0);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [counts, setCounts] = useState<InboxCounts>({ total: 0, byProject: [] });
 
-  // Refresh the open tree when its project changes on disk.
+  const refreshInbox = useCallback(
+    () =>
+      Promise.all([api.listInbox(), api.inboxCounts()]).then(
+        ([items, c]) => {
+          setInbox(items);
+          setCounts(c);
+        },
+        // Keep the last known Inbox; the next change or action retries.
+        () => {},
+      ),
+    [api],
+  );
+
+  useEffect(() => {
+    void refreshInbox();
+  }, [refreshInbox]);
+
+  // On changes: refresh the Inbox, and the open tree if its project changed.
   const viewRef = useRef(view);
   viewRef.current = view;
   useEffect(
     () =>
       api.onChanges((changes) => {
+        void refreshInbox();
         const v = viewRef.current;
         if (v.kind === "project" && changes.some((c) => c.projectId === v.id)) {
           setTreeVersion((n) => n + 1);
         }
       }),
-    [api],
+    [api, refreshInbox],
   );
+
+  /** Opens a file and marks its Inbox item read (if it has one). */
+  function open(file: OpenFile) {
+    setOpenFile(file);
+    setInbox((items) =>
+      items.map((i) =>
+        i.projectId === file.projectId && i.relPath === file.relPath ? { ...i, read: true } : i,
+      ),
+    );
+    void api.markRead(file.projectId, file.relPath).then(
+      (changed) => {
+        if (changed) void refreshInbox();
+      },
+      () => void refreshInbox(),
+    );
+  }
+
+  async function markAllRead() {
+    await api.markAllRead().catch(() => 0);
+    await refreshInbox();
+  }
 
   const refresh = useCallback(
     () =>
@@ -71,7 +113,7 @@ export function App() {
     setDialog(null);
     if (view.kind === "project" && view.id === project.id) setView({ kind: "inbox" });
     if (openFile?.projectId === project.id) setOpenFile(null);
-    await refresh();
+    await Promise.all([refresh(), refreshInbox()]);
   }
 
   const current = view.kind === "project" ? projects.find((p) => p.id === view.id) : undefined;
@@ -80,13 +122,14 @@ export function App() {
       ? "Add a project to get started."
       : view.kind === "project"
         ? "Select a Markdown file."
-        : "Select a project or a notification.";
+        : "Select a notification.";
 
   return (
     <div className="app">
       <aside className="pane pane-sidebar">
         <Sidebar
           projects={projects}
+          counts={counts}
           view={view}
           onSelectInbox={selectInbox}
           onSelectProject={selectProject}
@@ -100,13 +143,22 @@ export function App() {
         )}
       </aside>
       <div className="pane pane-center">
-        <CenterBar
-          view={view}
-          project={current}
-          selectedRel={openFile && current && openFile.projectId === current.id ? openFile.relPath : null}
-          onSelectFile={(relPath) => current && setOpenFile({ projectId: current.id, relPath })}
-          treeVersion={treeVersion}
-        />
+        {view.kind === "inbox" ? (
+          <InboxList
+            items={inbox}
+            unreadTotal={counts.total}
+            selected={openFile}
+            onOpen={(item) => open({ projectId: item.projectId, relPath: item.relPath })}
+            onMarkAllRead={() => void markAllRead()}
+          />
+        ) : (
+          <CenterBar
+            project={current}
+            selectedRel={openFile && current && openFile.projectId === current.id ? openFile.relPath : null}
+            onSelectFile={(relPath) => current && open({ projectId: current.id, relPath })}
+            treeVersion={treeVersion}
+          />
+        )}
       </div>
       <main className="pane pane-main">
         <Viewer file={openFile} placeholder={placeholder} />

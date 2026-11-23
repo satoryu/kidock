@@ -192,6 +192,104 @@ describe("App", () => {
     await waitFor(() => expect(listCalls).toBe(2)); // root + expanded "notes"
   });
 
+  describe("Inbox", () => {
+    const inboxRows = () =>
+      within(screen.getByRole("list", { name: "Notifications" })).getAllByRole("button");
+    const inboxButton = () => screen.getByRole("button", { name: /^Inbox/ });
+
+    it("shows new changes on top as unread with badges", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+
+      const t = Date.now();
+      act(() =>
+        api.emitChanges([{ projectId: 1, relPath: "notes/new.md", kind: "created", content: "# New" }], t - 1000),
+      );
+      act(() => api.emitChanges([{ projectId: 2, relPath: "README.md", kind: "updated" }], t));
+
+      await waitFor(() => expect(inboxRows()).toHaveLength(2));
+      expect(inboxRows()[0]).toHaveTextContent("README.md");
+      expect(inboxRows()[0]).toHaveClass("is-unread");
+      expect(within(inboxButton()).getByLabelText("2 unread")).toBeInTheDocument();
+      expect(within(projectButton("reports")).getByLabelText("1 unread")).toBeInTheDocument();
+      expect(within(projectButton("agent")).getByLabelText("1 unread")).toBeInTheDocument();
+
+      // Repeated saves keep a single item per file.
+      act(() => api.emitChanges([{ projectId: 2, relPath: "README.md", kind: "updated" }]));
+      act(() => api.emitChanges([{ projectId: 2, relPath: "README.md", kind: "updated" }]));
+      await waitFor(() => expect(inboxRows()).toHaveLength(2));
+    });
+
+    it("opens an item in the main area and marks it read", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      act(() =>
+        api.emitChanges([{ projectId: 1, relPath: "notes/new.md", kind: "created", content: "# Fresh" }]),
+      );
+      await waitFor(() => expect(inboxRows()).toHaveLength(1));
+
+      await userEvent.click(inboxRows()[0]);
+      expect(await screen.findByRole("heading", { name: "Fresh" })).toBeInTheDocument();
+      await waitFor(() => expect(inboxRows()[0]).not.toHaveClass("is-unread"));
+      expect(within(inboxButton()).queryByLabelText(/unread/)).not.toBeInTheDocument();
+      expect(inboxRows()[0]).toHaveAttribute("aria-current", "true");
+    });
+
+    it("marks an item read when its file is opened from the tree", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      act(() => api.emitChanges([{ projectId: 1, relPath: "README.md", kind: "updated" }]));
+      await waitFor(() => expect(within(inboxButton()).getByLabelText("1 unread")).toBeInTheDocument());
+
+      await userEvent.click(projectButton("reports"));
+      await userEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+      await waitFor(() =>
+        expect(within(inboxButton()).queryByLabelText(/unread/)).not.toBeInTheDocument(),
+      );
+    });
+
+    it("marks everything read", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      act(() =>
+        api.emitChanges([
+          { projectId: 1, relPath: "README.md", kind: "updated" },
+          { projectId: 2, relPath: "README.md", kind: "updated" },
+        ]),
+      );
+      await waitFor(() => expect(within(inboxButton()).getByLabelText("2 unread")).toBeInTheDocument());
+      await userEvent.click(screen.getByRole("button", { name: /mark all as read/i }));
+      await waitFor(() =>
+        expect(within(inboxButton()).queryByLabelText(/unread/)).not.toBeInTheDocument(),
+      );
+      expect(inboxRows().every((r) => !r.classList.contains("is-unread"))).toBe(true);
+      expect(screen.getByRole("button", { name: /mark all as read/i })).toBeDisabled();
+    });
+
+    it("drops a removed project's items and counts", async () => {
+      const api = createMockApi(seed());
+      renderWithApi(<App />, api);
+      await screen.findByRole("list", { name: "Projects" });
+      act(() =>
+        api.emitChanges([
+          { projectId: 1, relPath: "README.md", kind: "updated" },
+          { projectId: 2, relPath: "README.md", kind: "updated" },
+        ]),
+      );
+      await waitFor(() => expect(inboxRows()).toHaveLength(2));
+      await userEvent.click(screen.getByRole("button", { name: "Actions for reports" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+      await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
+      await waitFor(() => expect(inboxRows()).toHaveLength(1));
+      expect(inboxRows()[0]).toHaveTextContent("agent");
+      expect(within(inboxButton()).getByLabelText("1 unread")).toBeInTheDocument();
+    });
+  });
+
   it("shows an unavailable project with a warning and an error in the center bar", async () => {
     await renderApp(undefined, {
       projects: [{ name: "gone", path: "/mock/gone", files: {}, available: false }],
