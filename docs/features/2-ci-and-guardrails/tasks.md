@@ -22,8 +22,8 @@ Complete in order. Follow TDD (write a failing test first) for every task that c
 
 ## 4. CI
 
-- [ ] 4.1 Add `.nvmrc` (`22`) and `.gitattributes` (`* text=auto eol=lf`). Renormalize if needed.
-- [ ] 4.2 `.github/workflows/ci.yml` as designed. Re-check the inputs of each action's current major version (`actions/checkout@v7`, `actions/setup-node@v7`, `dtolnay/rust-toolchain`, `Swatinem/rust-cache@v2`) in their READMEs.
+- [x] 4.1 Add `.nvmrc` (`22`) and `.gitattributes` (`* text=auto eol=lf`). Renormalize if needed. → No CRLF files in the index (`git ls-files --eol`), so no renormalization was needed.
+- [x] 4.2 `.github/workflows/ci.yml` as designed. Re-check the inputs of each action's current major version (`actions/checkout@v7`, `actions/setup-node@v7`, `dtolnay/rust-toolchain`, `Swatinem/rust-cache@v2`) in their READMEs. → Inputs checked in the READMEs (`node-version-file`, `cache`, `components`, `workspaces: src-tauri -> target`, `persist-credentials`). Debug Rust builds do not need `dist/` (checked locally), so the cargo steps run before any frontend build.
 - [ ] 4.3 Open the PR and get CI green on both OSes (AC1). Fix Windows-only failures as they appear.
 - [ ] 4.4 AC2 real run: push a deliberately failing test, confirm `watch-pr.mjs` exits non-zero, then revert and confirm it exits 0.
 
