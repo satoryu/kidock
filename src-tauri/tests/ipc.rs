@@ -1,6 +1,12 @@
 //! IPC-level tests: invoke commands the way the WebView does (JSON bodies with
 //! camelCase argument names) through Tauri's mock runtime. This catches
 //! mismatches between `src/api/tauriApi.ts` and the Rust command signatures.
+//!
+//! Not built on Windows: tauri-build embeds the Common Controls v6 manifest
+//! only into the app binary, so a test executable that links the Tauri runtime
+//! fails to start there (`STATUS_ENTRYPOINT_NOT_FOUND`, seen on CI). The
+//! argument naming checked here is platform-independent, so macOS CI covers it.
+#![cfg(not(windows))]
 
 use std::fs;
 

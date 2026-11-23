@@ -125,7 +125,7 @@ npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
 npx vitest run --project scripts   # repository tooling only (hooks, CI helpers)
 ```
 
-IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`. On the Rust side, `src-tauri/tests/ipc.rs` invokes commands through Tauri's mock runtime with the same JSON bodies the frontend sends (camelCase argument names). Extend it whenever a command's signature changes, so `tauriApi.ts` and the Rust commands cannot drift apart.
+IPC-level frontend tests use `mockIPC` from `@tauri-apps/api/mocks`. `clearMocks()` runs after each test via `src/test/setup.ts`. On the Rust side, `src-tauri/tests/ipc.rs` invokes commands through Tauri's mock runtime with the same JSON bodies the frontend sends (camelCase argument names). Extend it whenever a command's signature changes, so `tauriApi.ts` and the Rust commands cannot drift apart. It is skipped on Windows (`#![cfg(not(windows))]`): test executables there lack the Common Controls manifest that the Tauri runtime needs (`STATUS_ENTRYPOINT_NOT_FOUND`).
 
 Vitest has two projects (`vite.config.ts`): `web` (jsdom, `src/**/*.test.{ts,tsx}`) and `scripts` (Node, `scripts/**/*.test.mjs` and `.claude/**/*.test.mjs`). Repository tooling is written as Node ESM scripts so it runs on Windows without Git Bash; keep the logic in pure functions under `scripts/lib/` and test those.
 
