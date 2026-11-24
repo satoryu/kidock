@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { useApi } from "../api/context";
+import { renderDiagrams } from "../markdown/mermaid";
 import { slugify } from "../markdown/paths";
 import { HEADING_ID_PREFIX, renderMarkdown } from "../markdown/render";
 import { messageFor } from "./errors";
@@ -86,17 +87,35 @@ export function Viewer({ file, version = 0, placeholder, onOpenLink }: ViewerPro
     // `anchor` is read only when a new file opens; it must not trigger a reload.
   }, [api, projectId, relPath, version]);
 
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
   useLayoutEffect(() => {
     const el = scroller();
     if (view.status !== "ok" || !el) return;
-    if (restoreTo.current !== null) {
-      el.scrollTop = restoreTo.current;
+    const target = restoreTo.current;
+    if (target !== null) {
+      el.scrollTop = target;
       restoreTo.current = null;
     }
-    if (pendingAnchor.current !== null) {
-      scrollToAnchor(pendingAnchor.current);
+    const anchorToShow = pendingAnchor.current;
+    if (anchorToShow !== null) {
+      scrollToAnchor(anchorToShow);
       pendingAnchor.current = null;
     }
+    // Diagrams render after insertion and change heights: re-apply the
+    // position once they are done (if this document is still the one shown).
+    const shown = view;
+    const article = rootRef.current?.querySelector<HTMLElement>("article.markdown-body");
+    if (!article) return;
+    void renderDiagrams(article, {
+      dark: window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
+      isCurrent: () => viewRef.current === shown,
+    }).then(() => {
+      if (viewRef.current !== shown) return;
+      if (anchorToShow !== null) scrollToAnchor(anchorToShow);
+      else if (target !== null && target > 0) el.scrollTop = target;
+    });
   }, [view]);
 
   // A same-file anchor change (e.g. two links into one file) scrolls without reloading.

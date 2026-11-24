@@ -5,6 +5,10 @@ import { slugify } from "./paths";
 import { type DocContext, sanitizeHtml } from "./sanitize";
 import { taskLists } from "./taskLists";
 
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
 /** Prefix for heading ids, so a heading can never clobber a DOM global (as on GitHub). */
 export const HEADING_ID_PREFIX = "user-content-";
 
@@ -34,6 +38,11 @@ export async function renderMarkdown(src: string, doc?: DocContext): Promise<str
     html: true, // allowed, then sanitized below
     linkify: true,
     highlight(code, info) {
+      // Mermaid diagrams render after insertion (src/markdown/mermaid.ts);
+      // until then the source shows as plain, escaped text.
+      if (info.trim().split(/\s+/)[0]?.toLowerCase() === "mermaid") {
+        return `<pre class="mermaid-src"><code>${escapeHtml(code)}</code></pre>`;
+      }
       const lang = resolveLang(hl, info);
       if (!lang) return ""; // markdown-it falls back to escaped <pre><code>
       return hl.codeToHtml(code, {

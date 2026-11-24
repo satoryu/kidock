@@ -743,3 +743,31 @@ button {
 .modal-actions .text-left-action {
   margin-right: auto;
 }
+
+/* ---- Mermaid (src/markdown/mermaid.ts) ---- */
+.markdown-body figure.mermaid {
+  margin: 16px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-body figure.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body figure.mermaid-error {
+  margin: 16px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+}
+
+.markdown-body figure.mermaid-error figcaption {
+  margin-bottom: 6px;
+  color: var(--danger);
+}
+
+.markdown-body figure.mermaid-error pre {
+  margin: 0;
+}

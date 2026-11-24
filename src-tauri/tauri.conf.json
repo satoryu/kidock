@@ -33,7 +33,7 @@
         "base-uri": "'none'",
         "form-action": "'none'"
       },
-      "freezePrototype": true
+      "freezePrototype": false
     }
   },
   "bundle": {

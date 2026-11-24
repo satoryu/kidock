@@ -190,3 +190,12 @@ describe("renderMarkdown: relative images and links", () => {
     expect(links[0].attributes).toHaveLength(0);
   });
 });
+
+describe("renderMarkdown: mermaid fences", () => {
+  it("emits an escaped placeholder for the diagram renderer", async () => {
+    const html = await renderMarkdown("```mermaid\ngraph TD; A-->B<script>x</script>\n```");
+    const pre = dom(html).querySelector("pre.mermaid-src");
+    expect(pre?.querySelector("code")?.textContent).toBe("graph TD; A-->B<script>x</script>\n");
+    expect(dom(html).querySelector("script")).toBeNull();
+  });
+});
