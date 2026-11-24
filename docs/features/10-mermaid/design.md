@@ -69,7 +69,7 @@ sequenceDiagram
 
 None (rendering only).
 
-## Open decision: Mermaid vs. `freezePrototype` (owner)
+## Decision: Mermaid vs. `freezePrototype`
 
 Found during the production-CSP emulation: with Tauri's `freezePrototype: true` (enabled since #1), **Mermaid cannot load in the built app**. Its date library **dayjs** assigns `proto.valueOf = function…` at module load. Once `Object.prototype` is frozen, that assignment throws in strict mode ("Cannot assign to read only property 'valueOf'"), which is the classic *override mistake*.
 
@@ -81,8 +81,15 @@ Options:
 
 | Option | Effect |
 |---|---|
-| A. Keep `freezePrototype` (current state of this PR) | Safe default; diagrams show an error box in the built app (they work in `tauri dev`, where the freeze does not apply) |
+| A. Keep `freezePrototype` | Safe default; diagrams show an error box in the built app (they work in `tauri dev`, where the freeze does not apply) |
 | B. Turn off `freezePrototype` | Diagrams work. The primary defenses (DOMPurify on all HTML and on Mermaid's SVG, a CSP without inline scripts or `eval`, validated commands) are unchanged. Mermaid's known pollution vector, config merging from diagram source, is already neutralized by `stripConfig` (removes `%%{init}%%` directives and front-matter config) |
 | C. Patch dayjs at build time so it defines properties instead of assigning them | Keeps both, but is brittle across dependency updates |
 
-This is a security setting, so the change was **not** made unattended. The PR stays open until the owner picks an option.
+**Decision (owner, 2026-11-24): option B.** `app.security.freezePrototype` is now `false` in `tauri.conf.json`. In exchange, these defenses must stay in place:
+
+- `stripConfig` runs on every diagram source before Mermaid sees it.
+- Mermaid runs with `securityLevel: "strict"` and `htmlLabels: false`.
+- Its SVG is sanitized again by DOMPurify.
+- The CSP keeps `script-src 'self'` (no inline scripts, no `eval`).
+
+Revisit this if dayjs (or Mermaid) stops assigning to built-in prototypes; turning the freeze back on is then a one-line change.
