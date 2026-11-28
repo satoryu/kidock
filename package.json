@@ -1,7 +1,7 @@
 {
   "name": "kidock",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1-rc.1",
   "description": "Kidock — the dock where your agents' work arrives.",
   "license": "MIT",
   "type": "module",
