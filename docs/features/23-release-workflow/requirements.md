@@ -14,6 +14,7 @@ Kidock has CI but no way to ship. Installing it today means cloning the repo and
   - the tagged commit is not on `main`.
 - **F3 — Builds**: macOS Apple Silicon (`aarch64-apple-darwin`), macOS Intel (`x86_64-apple-darwin`), and Windows x64, built in release mode.
 - **F4 — Assets**: the Release carries each platform's installers (macOS `.dmg`; Windows `.msi` and NSIS `-setup.exe`). Updater artifacts are out of scope.
+  - Pre-release tags ship only the NSIS installer on Windows: WiX rejects a non-numeric pre-release such as `0.2.0-rc.1` (found during implementation, see design).
 - **F5 — Release notes**: generated automatically by GitHub from the PRs merged since the previous release, grouped by label (`.github/release.yml`):
   - Features: `enhancement`
   - Bug fixes: `bug`
@@ -25,7 +26,7 @@ Kidock has CI but no way to ship. Installing it today means cloning the repo and
 - **F7 — Unsigned builds** (owner decision):
   - macOS builds get an ad-hoc signature (`signingIdentity: "-"`). Without it, Apple Silicon reports apps downloaded from the internet as damaged.
   - Windows builds are unsigned.
-  - Adding real signing later must only require adding secrets and a config value, not restructuring the workflow.
+  - Adding real signing later must only require adding secrets and env entries, not restructuring the workflow.
 - **F8 — Version bump helper**: `npm run version:set -- 0.2.0` updates all three version fields (and `Cargo.lock`) in one step, so F2 is easy to satisfy.
 - **F9 — Release procedure** is documented: bump the version in a PR, merge, tag `main`, push the tag.
 

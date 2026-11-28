@@ -139,6 +139,13 @@ GitHub flow is used as the branching strategy.
 - `main` branch: This is the always-releasable branch. Only code that has been tested and approved should be merged into this branch.
 - `feature/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]` branches: These branches are used for developing new features. They should be created from the `main` branch and merged back into `main` when the feature is complete.
 
+## Releases
+
+Pushing a `vX.Y.Z` tag on `main` builds macOS (arm64, x64) and Windows installers and publishes a GitHub Release (`.github/workflows/release.yml`, #23). Bump the version with `npm run version:set -- X.Y.Z` in a PR first; the workflow refuses a tag that differs from the version in `package.json`, `Cargo.toml`, or `tauri.conf.json`. Procedure and recovery: [`docs/releasing.md`](docs/releasing.md).
+
+- **Label every PR** with its Issue's label (`enhancement`, `bug`, `documentation`). Release notes are grouped by PR label (`.github/release.yml`); `skip-changelog` leaves a PR out.
+- Builds are unsigned (macOS ad-hoc). Do not add empty signing env vars to the workflow; an unset secret expands to `""`.
+
 ## Code Reviews
 
 After completing the implementation of a feature, you must create a pull request to merge the `feature/[ISSUE-NUMBER]-[SHORT-DESCRIPTION]` branch into the `main` branch.

@@ -19,9 +19,9 @@ New file: `.github/workflows/release.yml`. It is separate from `ci.yml`: the tag
 
 | Job | Runs on | Permissions | What it does |
 |---|---|---|---|
-| `prepare` | ubuntu-latest | `contents: write` | Checks the version and that the tag is on `main`. Creates a **draft** release with generated notes (`gh release create --draft --generate-notes --notes "<install header>"`, plus `--prerelease` for `-suffix` tags). Outputs `release_id`. |
+| `prepare` | ubuntu-latest | `contents: write` | Checks the version and that the tag is on `main`. Fails if a release for the tag already exists. Creates a **draft** release with generated notes through the REST API (`POST /releases` with `draft`, `prerelease`, `generate_release_notes`; the install header in `body` is prepended to the notes). Outputs `release_id`. |
 | `build` (matrix) | macos-latest ×2, windows-latest | `contents: write` | Builds with `tauri-apps/tauri-action@v1` and `releaseId` from `prepare`, uploading assets to that draft. `uploadUpdaterJson: false`. |
-| `publish` | ubuntu-latest | `contents: write` | Runs only if every build succeeded (`needs: build`). `gh release edit <tag> --draft=false`. |
+| `publish` | ubuntu-latest | `contents: write` | Runs only if every build succeeded (`needs: build`). `PATCH /releases/{release_id}` with `draft=false`. |
 
 - **Why a draft first**: with `releaseDraft: false`, each matrix job's tauri-action would create or publish the release on its own, so it could go public with only some assets (F6). One draft, uploaded to by `releaseId`, then one publish step, makes publishing all-or-nothing.
 - **Concurrency**: `group: release-${{ github.ref }}` without cancellation, so a re-pushed tag never races itself.
@@ -33,7 +33,9 @@ From the Tauri v2 GitHub pipeline guide (verified):
 - `macos-latest` with `args: --target x86_64-apple-darwin`
 - `windows-latest` with `args: ""`
 
-Rust targets are added with `dtolnay/rust-toolchain@stable` (`targets:` set for macOS only). Node comes from `.nvmrc`, with `npm ci`, and `Swatinem/rust-cache@v2` (the same setup as `ci.yml`).
+Each matrix entry names its Rust target (`x86_64-pc-windows-msvc` for Windows), passed to both `dtolnay/rust-toolchain@stable` (`targets:`) and `tauri build --target`.
+
+**Pre-release tags on Windows** (found during implementation): the WiX bundler's `convert_version` (tauri-bundler `msi/mod.rs`) accepts a pre-release only if it is numeric and ≤ 65535; `0.2.0-rc.1` fails with "optional pre-release identifier in app version must be numeric-only…". NSIS has no such limit. So for pre-release tags the Windows build adds `--bundles nsis`. (`bundle.windows.wix.version` could override the MSI version, but a 4-part MSI version for an RC would sort above the final release.) Node comes from `.nvmrc`, with `npm ci`, and `Swatinem/rust-cache@v2` (the same setup as `ci.yml`).
 
 ### Version guard (`scripts/release-check.mjs`)
 
@@ -67,7 +69,7 @@ Rust targets are added with `dtolnay/rust-toolchain@stable` (`targets:` set for 
 ### Unsigned builds, ready for signing
 
 - `tauri.conf.json`: `bundle.macOS.signingIdentity: "-"` (ad-hoc).
-- The `build` job passes the optional signing secrets as env vars (`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_*`). They are empty today, so the ad-hoc identity applies. When certificates arrive, adding the secrets switches to real signing and notarization. The design doc for that Issue will confirm that the env var overrides the config value.
+- The signing env vars (`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_*`) are **not** wired yet: an unset secret expands to an empty string, and an empty `APPLE_SIGNING_IDENTITY` or `APPLE_CERTIFICATE` would be read as set. `docs/releasing.md` lists them; the signing Issue adds the secrets and the env entries together, and confirms that the env var overrides the config value.
 - Windows signing (a `certificateThumbprint` or `signCommand`) is a later Issue.
 
 ### Docs

@@ -132,6 +132,15 @@ jobs:
             ${{ matrix.platform == 'windows-latest' && needs.prepare.outputs.prerelease == 'true' && '--bundles nsis' || '' }}
           uploadUpdaterJson: false
 
+      # Without a valid (ad-hoc) signature, Apple Silicon reports a downloaded
+      # app as damaged. Fail the build, and so the release, if it is missing.
+      - name: Check the macOS code signature
+        if: runner.os == 'macOS'
+        run: |
+          app="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Kidock.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E '^(Identifier|Format|Signature|CodeDirectory)'
+
   # Publishes only when every build uploaded its assets.
   publish:
     needs: [prepare, build]

@@ -4,7 +4,7 @@
 
 Kidock — the dock where your agents' work arrives.
 
-> **Status: early development.** Nothing is usable yet, and features and the tech stack may change.
+> **Status: early development.** Features and the tech stack may change.
 
 ## Overview
 
@@ -18,6 +18,15 @@ AI agents such as Claude Code often write their results as Markdown files into l
 The name comes from the Japanese 既読 (*kidoku*, "already read") + *dock*.
 
 Kidock targets Windows and macOS. It does not edit files.
+
+## Install
+
+Download the installer for your OS from [Releases](https://github.com/satoryu/kidock/releases):
+
+- **macOS**: the `.dmg` for your Mac (`aarch64` = Apple Silicon, `x64` = Intel). The app is not notarized yet: on first launch, right-click Kidock → **Open**.
+- **Windows**: the `-setup.exe` or the `.msi`. The installer is not signed yet: if SmartScreen appears, choose **More info → Run anyway**.
+
+Maintainers: see [docs/releasing.md](docs/releasing.md).
 
 ## License
 
