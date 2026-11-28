@@ -138,6 +138,15 @@ describe("createMockApi", () => {
     expect((await api.getExclusions()).defaults).toContain("node_modules");
   });
 
+  it("records copied text and can simulate a clipboard failure", async () => {
+    const api = createMockApi({});
+    await api.copyText("npm test");
+    expect(api.copiedTexts).toEqual(["npm test"]);
+    api.failCopy = true;
+    await expect(api.copyText("x")).rejects.toMatchObject({ kind: "Io" });
+    expect(api.copiedTexts).toEqual(["npm test"]);
+  });
+
   it("returns the configured picker result", async () => {
     expect(await createMockApi({}, { pickResult: null }).pickFolder()).toBeNull();
     expect(await createMockApi({}, { pickResult: "/x" }).pickFolder()).toBe("/x");

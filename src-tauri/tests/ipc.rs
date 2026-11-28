@@ -118,6 +118,11 @@ fn project_lifecycle_over_ipc() {
         assert_eq!(err["kind"], json!("InvalidPath"), "{url}");
     }
 
+    // Copy: the argument is `text`. The mock app has no clipboard plugin, so a
+    // well-formed call reaches the command and fails with `Io`.
+    let err = invoke(&webview, "copy_text", json!({ "text": "npm test" })).unwrap_err();
+    assert_eq!(err["kind"], json!("Io"));
+
     // Exclusions.
     let ex = invoke(&webview, "get_exclusions", json!({})).unwrap();
     assert_eq!(ex["patterns"], ex["defaults"]);
@@ -163,4 +168,31 @@ fn project_lifecycle_over_ipc() {
     let err = invoke(&webview, "list_dir", json!({ "projectId": id, "rel": "" })).unwrap_err();
     assert_eq!(err["kind"], json!("ProjectNotFound"));
     assert!(dir.path().join("docs/a.md").exists());
+}
+
+/// Writes to the real system clipboard, so it is not run by default (it would
+/// clobber the developer's clipboard and needs a desktop session). Run with
+/// `cargo test --test ipc -- --ignored` to check the IPC → command → plugin →
+/// OS chain end to end.
+#[test]
+#[ignore = "writes to the real system clipboard"]
+fn copy_text_reaches_the_system_clipboard() {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    let state = Arc::new(AppState::load(Store::open_in_memory().unwrap()).unwrap());
+    let app = kidock_lib::with_commands(
+        mock_builder()
+            .manage(state)
+            .plugin(tauri_plugin_clipboard_manager::init()),
+    )
+    .build(mock_context(noop_assets()))
+    .unwrap();
+    let webview = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let text = format!("kidock copy check {}\n  indented", std::process::id());
+    assert_eq!(
+        invoke(&webview, "copy_text", json!({ "text": text })),
+        Ok(Value::Null)
+    );
+    assert_eq!(app.clipboard().read_text().unwrap(), text);
 }

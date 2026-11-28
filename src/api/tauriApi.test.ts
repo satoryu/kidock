@@ -141,6 +141,16 @@ describe("tauriApi links and assets", () => {
     await tauriApi.openExternal("https://example.com");
     expect(calls).toEqual([{ cmd: "open_external", payload: { url: "https://example.com" } }]);
   });
+
+  it("copies text through the backend command", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+    await tauriApi.copyText("npm test");
+    expect(calls).toEqual([{ cmd: "copy_text", payload: { text: "npm test" } }]);
+  });
 });
 
 describe("tauriApi exclusions", () => {

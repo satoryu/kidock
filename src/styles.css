@@ -454,6 +454,11 @@ button {
 }
 
 .markdown-body {
+  /* An explicit width: as a flex item with auto margins, the article would
+     otherwise grow to its min-content width (a long code line) and overflow
+     narrow panes, pushing code blocks' copy buttons out of view. */
+  box-sizing: border-box;
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 24px 32px 64px;
@@ -500,6 +505,89 @@ button {
   background: var(--code-bg);
   border-radius: 6px;
   line-height: 1.45;
+}
+
+/* Copy button on code blocks (#21, src/markdown/codeCopy.ts). The wrapper
+   holds the position so the button stays put when the code scrolls sideways. */
+.markdown-body .code-block {
+  position: relative;
+  margin: 1em 0;
+}
+
+.markdown-body .code-block > pre {
+  margin: 0;
+}
+
+.markdown-body .code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.markdown-body .code-block:hover .code-copy,
+.markdown-body .code-copy:focus-visible {
+  opacity: 1;
+}
+
+.markdown-body .code-copy:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.markdown-body .code-copy svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.markdown-body .code-copy-msg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--fg);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.markdown-body .code-copy-msg.visible {
+  opacity: 1;
+  transition: opacity 0.1s;
+}
+
+.markdown-body .code-copy-msg.error {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body .code-copy,
+  .markdown-body .code-copy-msg,
+  .markdown-body .code-copy-msg.visible {
+    transition: none;
+  }
 }
 
 .markdown-body blockquote {

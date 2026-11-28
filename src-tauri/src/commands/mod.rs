@@ -21,6 +21,7 @@ use crate::domain::{
     DomainError, EntryKind, ExclusionRules, Project, ProjectId, RelPath, TreeEntry, check_overlap,
     project_name,
 };
+use crate::infra::clipboard::ClipboardWriter;
 use crate::infra::fs_reader;
 use crate::infra::store::{InboxRow, UnreadCounts};
 use crate::state::AppState;
@@ -309,6 +310,31 @@ pub fn open_external<R: Runtime>(app: AppHandle<R>, url: String) -> Result<(), C
         .map_err(|e| DomainError::Io(format!("failed to open the link: {e}")).into())
 }
 
+/// Writes plain text (a code block's source) to the system clipboard (#21).
+///
+/// The WebView has no clipboard permission; this write-only command is the
+/// only clipboard access it has.
+#[tauri::command(async)]
+pub fn copy_text<R: Runtime>(app: AppHandle<R>, text: String) -> Result<(), CommandError> {
+    use tauri::Manager;
+    let clipboard = app.try_state::<tauri_plugin_clipboard_manager::Clipboard<R>>();
+    do_copy_text(
+        clipboard
+            .as_ref()
+            .map(|c| c.inner() as &dyn ClipboardWriter),
+        text,
+    )
+    .map_err(Into::into)
+}
+
+/// `writer` is `None` when the clipboard plugin is not registered (IPC tests).
+pub fn do_copy_text(writer: Option<&dyn ClipboardWriter>, text: String) -> Result<(), DomainError> {
+    let writer = writer.ok_or_else(|| DomainError::Io("the clipboard is not available".into()))?;
+    writer
+        .write_text(&text)
+        .map_err(|e| DomainError::Io(format!("failed to copy to the clipboard: {e}")))
+}
+
 #[tauri::command(async)]
 pub fn list_dir(
     state: State<'_, Arc<AppState>>,
@@ -383,6 +409,51 @@ mod tests {
     use crate::infra::store::Store;
     use std::fs;
     use tempfile::TempDir;
+
+    struct FakeClipboard {
+        fail: bool,
+        written: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl ClipboardWriter for FakeClipboard {
+        fn write_text(&self, text: &str) -> Result<(), String> {
+            if self.fail {
+                return Err("clipboard busy".into());
+            }
+            self.written.lock().unwrap().push(text.to_owned());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn copy_text_writes_the_text_unchanged() {
+        let cb = FakeClipboard {
+            fail: false,
+            written: Default::default(),
+        };
+        do_copy_text(Some(&cb), "npm test\n  --watch".into()).unwrap();
+        assert_eq!(
+            *cb.written.lock().unwrap(),
+            vec!["npm test\n  --watch".to_string()]
+        );
+    }
+
+    #[test]
+    fn copy_text_reports_clipboard_failures_as_io() {
+        let cb = FakeClipboard {
+            fail: true,
+            written: Default::default(),
+        };
+        let err = do_copy_text(Some(&cb), "x".into()).unwrap_err();
+        assert!(
+            matches!(&err, DomainError::Io(m) if m.contains("clipboard busy")),
+            "{err:?}"
+        );
+        assert!(matches!(
+            do_copy_text(None, "x".into()),
+            Err(DomainError::Io(_))
+        ));
+    }
 
     fn state() -> AppState {
         AppState::load(Store::open_in_memory().unwrap()).unwrap()

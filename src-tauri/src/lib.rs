@@ -36,6 +36,7 @@ pub fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::get_notifications_enabled,
         commands::set_notifications_enabled,
         commands::open_external,
+        commands::copy_text,
         commands::get_exclusions,
         commands::set_exclusions,
     ])
@@ -47,6 +48,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .register_asynchronous_uri_scheme_protocol(
             infra::asset_protocol::SCHEME,
             |ctx, request, responder| {
