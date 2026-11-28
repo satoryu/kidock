@@ -406,6 +406,9 @@ pub fn set_notifications_enabled(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infra::store::Store;
+    use std::fs;
+    use tempfile::TempDir;
 
     struct FakeClipboard {
         fail: bool,
@@ -451,9 +454,6 @@ mod tests {
             Err(DomainError::Io(_))
         ));
     }
-    use crate::infra::store::Store;
-    use std::fs;
-    use tempfile::TempDir;
 
     fn state() -> AppState {
         AppState::load(Store::open_in_memory().unwrap()).unwrap()
