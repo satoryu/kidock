@@ -1,0 +1,19 @@
+# Categories for automatically generated release notes (#23).
+# PRs are sorted by label; give each PR its Issue's label.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Bug fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Other changes
+      labels:
+        - "*"

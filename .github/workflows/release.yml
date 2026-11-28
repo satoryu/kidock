@@ -1,0 +1,157 @@
+name: Release
+
+# Push a version tag on main to build and publish a GitHub Release (#23):
+#   npm run version:set -- 0.2.0   (in a PR, merged to main)
+#   git tag v0.2.0 && git push origin v0.2.0
+# See docs/releasing.md.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Checks the tag, then creates one draft release that every build uploads to.
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # for the merge-base check against origin/main
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check the tag against the app version
+        id: check
+        run: node scripts/release-check.mjs "$GITHUB_REF_NAME" --github-output
+
+      - name: Check that the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main. Tag a commit that has been merged to main."
+            exit 1
+          fi
+
+      - name: Create the draft release
+        id: draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          PRERELEASE: ${{ steps.check.outputs.prerelease }}
+        run: |
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          if [ -n "$existing" ]; then
+            echo "::error::A release for $GITHUB_REF_NAME already exists (id $existing). Delete it, then re-run."
+            exit 1
+          fi
+          # The body is prepended to the generated notes (.github/release.yml).
+          cat > header.md <<'EOF'
+          ## Install
+
+          - **macOS**: download the `.dmg` for your Mac (`aarch64` = Apple Silicon, `x64` = Intel), open it, and drag Kidock to Applications. The app is not notarized yet: on first launch, right-click Kidock → **Open**, or allow it in **System Settings → Privacy & Security**.
+          - **Windows**: run the `-setup.exe` (or the `.msi`). The installer is not signed yet: if SmartScreen appears, choose **More info → Run anyway**.
+
+          EOF
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -X POST \
+            -f tag_name="$GITHUB_REF_NAME" \
+            -f name="Kidock $VERSION" \
+            -F body=@header.md \
+            -F draft=true \
+            -F prerelease="$PRERELEASE" \
+            -F generate_release_notes=true \
+            --jq .id)
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+          echo "Draft release $id created"
+
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false # report every platform
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # WiX (.msi) accepts only a numeric pre-release, so pre-release tags
+      # such as v0.2.0-rc.1 ship the NSIS installer alone on Windows.
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Code signing is not set up yet; macOS builds are ad-hoc signed
+          # (bundle.macOS.signingIdentity "-"). docs/releasing.md lists the
+          # env vars to add here once certificates exist.
+        with:
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          args: >-
+            --target ${{ matrix.target }}
+            ${{ matrix.platform == 'windows-latest' && needs.prepare.outputs.prerelease == 'true' && '--bundles nsis' || '' }}
+          uploadUpdaterJson: false
+
+      # Without a valid (ad-hoc) signature, Apple Silicon reports a downloaded
+      # app as damaged. Fail the build, and so the release, if it is missing.
+      - name: Check the macOS code signature
+        if: runner.os == 'macOS'
+        run: |
+          app="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Kidock.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E '^(Identifier|Format|Signature|CodeDirectory)'
+
+  # Publishes only when every build uploaded its assets.
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -X PATCH -F draft=false \
+            --jq '"Published " + .html_url'
