@@ -118,6 +118,11 @@ fn project_lifecycle_over_ipc() {
         assert_eq!(err["kind"], json!("InvalidPath"), "{url}");
     }
 
+    // Copy: the argument is `text`. The mock app has no clipboard plugin, so a
+    // well-formed call reaches the command and fails with `Io`.
+    let err = invoke(&webview, "copy_text", json!({ "text": "npm test" })).unwrap_err();
+    assert_eq!(err["kind"], json!("Io"));
+
     // Exclusions.
     let ex = invoke(&webview, "get_exclusions", json!({})).unwrap();
     assert_eq!(ex["patterns"], ex["defaults"]);
