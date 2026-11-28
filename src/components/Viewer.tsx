@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { useApi } from "../api/context";
+import { addCopyButtons, copyFromButton } from "../markdown/codeCopy";
 import { renderDiagrams } from "../markdown/mermaid";
 import { slugify } from "../markdown/paths";
 import { HEADING_ID_PREFIX, renderMarkdown } from "../markdown/render";
@@ -108,6 +109,7 @@ export function Viewer({ file, version = 0, placeholder, onOpenLink }: ViewerPro
     const shown = view;
     const article = rootRef.current?.querySelector<HTMLElement>("article.markdown-body");
     if (!article) return;
+    addCopyButtons(article);
     void renderDiagrams(article, {
       dark: window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
       isCurrent: () => viewRef.current === shown,
@@ -138,8 +140,14 @@ export function Viewer({ file, version = 0, placeholder, onOpenLink }: ViewerPro
   }
 
   // The WebView never navigates: links are routed by the attributes that
-  // `sanitizeHtml` set (see src/markdown/sanitize.ts).
+  // `sanitizeHtml` set (see src/markdown/sanitize.ts). Copy buttons on code
+  // blocks are added after insertion (src/markdown/codeCopy.ts).
   const onClick = (e: MouseEvent) => {
+    const copyButton = (e.target as Element).closest<HTMLElement>("button.code-copy");
+    if (copyButton) {
+      void copyFromButton(copyButton, (text) => api.copyText(text));
+      return;
+    }
     const a = (e.target as Element).closest("a");
     if (!a) return;
     e.preventDefault();

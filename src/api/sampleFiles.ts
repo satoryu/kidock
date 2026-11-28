@@ -53,6 +53,12 @@ npm run tauri dev
 \`\`\`nosuchlang
 plain fallback <b>not bold</b>
 \`\`\`
+
+A long line (scrolls sideways; the copy button stays in the corner):
+
+\`\`\`sh
+curl -fsSL "https://example.com/a/very/long/path/that/keeps/going/and/going?with=query&parameters=enough&to=overflow" | jq '.items[] | {id, name, updatedAt}'
+\`\`\`
 `,
   "diagrams/mermaid.md": `# Mermaid samples
 

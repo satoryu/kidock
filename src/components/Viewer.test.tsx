@@ -203,4 +203,40 @@ describe("Viewer", () => {
     renderWithApi(<Viewer file={open("a.md")} placeholder="" />, failing);
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
   });
+
+  describe("code block copy buttons", () => {
+    const code = { "c.md": "# Code\n\n```sh\nnpm test\n```\n\nafter" };
+    const codeApi = () => createMockApi({ projects: [{ name: "p", path: "/mock/p", files: code }] });
+
+    it("copies the block's source and shows 'Copied' over that block", async () => {
+      const mock = codeApi();
+      renderWithApi(<Viewer file={open("c.md")} placeholder="" />, mock);
+      const button = await screen.findByRole("button", { name: "Copy code" });
+      fireEvent.click(button);
+      expect(await screen.findByRole("status")).toHaveTextContent("Copied");
+      expect(mock.copiedTexts).toEqual(["npm test"]);
+      expect(screen.getByRole("status").closest(".code-block")).toBe(button.closest(".code-block"));
+    });
+
+    it("shows 'Copy failed' when the clipboard is unavailable", async () => {
+      const mock = codeApi();
+      mock.failCopy = true;
+      renderWithApi(<Viewer file={open("c.md")} placeholder="" />, mock);
+      fireEvent.click(await screen.findByRole("button", { name: "Copy code" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("Copy failed");
+    });
+
+    it("adds the button again after the file re-renders", async () => {
+      const mock = codeApi();
+      const file = open("c.md");
+      const { rerender } = renderWithApi(<Viewer file={file} version={0} placeholder="" />, mock);
+      await screen.findByRole("button", { name: "Copy code" });
+      mock.emitChanges([{ projectId: 1, relPath: "c.md", kind: "updated", content: "```\nls -la\n```" }]);
+      rerender(<Viewer file={file} version={1} placeholder="" />);
+      await screen.findByText("ls -la");
+      fireEvent.click(await screen.findByRole("button", { name: "Copy code" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("Copied");
+      expect(mock.copiedTexts).toEqual(["ls -la"]);
+    });
+  });
 });
