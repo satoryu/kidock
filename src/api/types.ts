@@ -91,6 +91,8 @@ export interface KidockApi {
   assetUrl(projectId: number, relPath: string): string;
   /** Opens an http(s) link in the browser, or mailto in the mail client (others are refused). */
   openExternal(url: string): Promise<void>;
+  /** Writes plain text to the system clipboard (write-only; see `copy_text`). */
+  copyText(text: string): Promise<void>;
   /** Exclusion patterns (glob per path component) and the built-in defaults. */
   getExclusions(): Promise<{ patterns: string[]; defaults: string[] }>;
   /** Saves patterns (validated; blanks dropped). Resolves to the normalized list. */

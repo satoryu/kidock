@@ -72,6 +72,10 @@ export type MockApi = KidockApi & {
   emitOpenRequest(request: OpenRequest): void;
   /** URLs passed to `openExternal`, for assertions. */
   readonly openedUrls: string[];
+  /** Texts passed to `copyText`, for assertions. */
+  readonly copiedTexts: string[];
+  /** When true, `copyText` fails like an unavailable clipboard. */
+  failCopy: boolean;
 };
 
 /**
@@ -127,7 +131,7 @@ export function createMockApi(
     return p.files;
   }
 
-  return {
+  const api: MockApi = {
     async pickFolder() {
       await wait();
       return pickResult;
@@ -250,6 +254,15 @@ export function createMockApi(
     },
 
     openedUrls,
+    copiedTexts: [] as string[],
+    failCopy: false,
+
+    async copyText(text) {
+      await wait();
+      // `api`, not `this`: callers may pass the method around unbound.
+      if (api.failCopy) throw new KidockError("Io", "failed to copy to the clipboard: mock failure");
+      api.copiedTexts.push(text);
+    },
 
     async openExternal(url) {
       await wait();
@@ -329,4 +342,5 @@ export function createMockApi(
       return content;
     },
   };
+  return api;
 }
