@@ -95,6 +95,10 @@ describe("setJsonVersion", () => {
     expect(JSON.parse(conf).bundle.windows.wix.version).toBe("1.0.0");
   });
 
+  it("rejects malformed JSON instead of scanning it", () => {
+    expect(() => setJsonVersion('{ "version": "0.1.0', "0.2.0")).toThrow();
+  });
+
   it("throws when there is no top-level version", () => {
     expect(() => setJsonVersion('{ "a": { "version": "1.0.0" } }', "0.2.0")).toThrow(/version/);
   });

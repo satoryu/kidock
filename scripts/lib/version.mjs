@@ -68,6 +68,7 @@ export function checkVersions(expected, versions) {
 
 /** Replaces the top-level `"version"` string of a JSON document, keeping all other text. */
 export function setJsonVersion(text, version) {
+  JSON.parse(text); // the scanner below assumes well-formed JSON
   const span = topLevelVersionSpan(text);
   if (!span) throw new Error("no top-level version field");
   return text.slice(0, span.start) + JSON.stringify(version) + text.slice(span.end);
